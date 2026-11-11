@@ -2,8 +2,21 @@ import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 
 export class HttpError extends Error {
-  constructor(public statusCode: number, message: string, public code = "ERROR") {
+  // Deliberately NOT using TypeScript parameter-property shorthand
+  // (`constructor(public statusCode: number, ...)`) here: Node's
+  // `--experimental-strip-types` (used to run apps/api's own test suite
+  // with zero installed dependencies — see package.json's "test" script)
+  // only strips type annotations syntactically and does not support that
+  // shorthand, even though `tsc` itself accepts it fine. This bit CI the
+  // moment a real test file actually imported this module — see the
+  // integration test suite under src/test.
+  statusCode: number;
+  code: string;
+
+  constructor(statusCode: number, message: string, code = "ERROR") {
     super(message);
+    this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
