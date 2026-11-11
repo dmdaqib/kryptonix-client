@@ -61,5 +61,8 @@ jobs:
       - name: Unit tests (packages/shared)
         run: pnpm --filter @kryptonix/shared test
 
+      - name: Integration tests (apps/api, real Postgres)
+        run: pnpm --filter @kryptonix/api test
+
       - name: Mobile typecheck
         run: pnpm --filter @kryptonix/mobile typecheck

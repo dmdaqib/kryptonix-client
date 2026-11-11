@@ -15,6 +15,11 @@ import { invoiceRoutes } from "./modules/payments/invoices.routes.ts";
 import { paymentRoutes } from "./modules/payments/payments.routes.ts";
 import { refundRoutes } from "./modules/payments/refunds.routes.ts";
 import { webhookRoutes } from "./modules/payments/webhook.routes.ts";
+import { projectRoutes } from "./modules/projects/projects.routes.ts";
+import { messagingRoutes } from "./modules/projects/messaging.routes.ts";
+import { fileRoutes } from "./modules/projects/files.routes.ts";
+import { ticketRoutes } from "./modules/support/tickets.routes.ts";
+import { notificationRoutes } from "./modules/notifications/notifications.routes.ts";
 
 export async function buildServer() {
   const app = Fastify({
@@ -59,6 +64,11 @@ export async function buildServer() {
       await api.register(invoiceRoutes);
       await api.register(paymentRoutes);
       await api.register(refundRoutes);
+      await api.register(projectRoutes);
+      await api.register(messagingRoutes);
+      await api.register(fileRoutes);
+      await api.register(ticketRoutes);
+      await api.register(notificationRoutes);
     },
     { prefix: "/api/v1" },
   );
