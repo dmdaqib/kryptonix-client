@@ -42,7 +42,12 @@ export default function AppTabsLayout() {
           (app) so they share auth guarding + the root QueryClient. */}
       <Tabs.Screen name="services/[slug]" options={{ href: null }} />
       <Tabs.Screen name="projects/[id]" options={{ href: null }} />
+      <Tabs.Screen name="projects/[id]/messages" options={{ href: null }} />
       <Tabs.Screen name="invoices/[id]" options={{ href: null }} />
+      <Tabs.Screen name="tickets/index" options={{ href: null }} />
+      <Tabs.Screen name="tickets/[id]" options={{ href: null }} />
+      <Tabs.Screen name="tickets/new" options={{ href: null }} />
+      <Tabs.Screen name="notifications/index" options={{ href: null }} />
     </Tabs>
   );
 }

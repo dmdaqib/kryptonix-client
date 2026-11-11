@@ -3,6 +3,14 @@
 Read this first. It's the honest, current state of the project — what
 runs, what's written-but-unverified, and what's not started.
 
+**Update:** CI is green on `main` (`.github/workflows/ci.yml`, GitHub's
+own runners, real network access). Everything below that was "written,
+not executed here" has since actually run on a real Postgres service
+container and a real `pnpm install` — typecheck, `packages/shared`'s
+unit tests, and (as of the P3/P5 work) a real integration test suite for
+`apps/api` all pass. The per-phase sections below are left as originally
+written where still accurate, with corrections noted inline.
+
 ## Environment this was built in (read this before judging "why wasn't X run")
 
 This repo was built inside a sandboxed agent environment with **no access
@@ -108,14 +116,41 @@ automation/AI) — no invented categories or prices.
 Package availability-window logic (schema exists, unused). Mobile screens
 for the quote accept/reject/revision flow (API exists; screen not built).
 
-## P3 — Project Collaboration: 📋 schema only
+## P3 — Project Collaboration: ✅ implemented and integration-tested
 
 `Project`, `Milestone`, `ProjectTask`, `Conversation`/`Message`, `File`,
-`Deliverable`/`Approval` are fully modeled in the database with the
-relationships and indexes the spec calls for. **No route handlers or
-mobile screens exist yet** — the mobile Projects tab calls the (not yet
-implemented) `/organizations/:id/projects` endpoint so no further UI
-rework is needed once it ships, but it will currently 404.
+`Deliverable`/`Approval` now have real route handlers
+(`apps/api/src/modules/projects/{projects,messaging,files}.routes.ts`)
+and real mobile screens:
+
+- **Project detail** (`projects/[id].tsx`): status, milestones with their
+  latest deliverable, client approve/request-changes actions, and
+  (for staff) create-milestone / submit-deliverable actions, plus
+  project updates.
+- **Project chat** (`projects/[id]/messages.tsx`): one conversation per
+  project (created lazily), staff-only internal notes hidden from the
+  client, simple 5s polling (no websocket/realtime transport is wired
+  up — see Known limitations).
+
+Staff and client share the same screens, gated by `user.userType` —
+there's no separate staff app; a staff user signed into this app sees
+the create/submit/assign actions a client doesn't.
+
+**Verified end-to-end** by `apps/api/src/test/projects-and-support.integration.test.ts`,
+which runs the real Fastify server (`app.inject()`, real Postgres) through:
+create project → add staff member → create milestone → register a file →
+submit deliverable (milestone → `SUBMITTED_FOR_REVIEW`, client notified) →
+client approves (milestone → `APPROVED`, staff notified) → both sides
+exchange project messages → an outsider is correctly refused. This is a
+stronger guarantee than typecheck alone — it's the actual route code
+running against the actual schema.
+
+**Not implemented:** real file upload/object storage (deliverables
+register file *metadata* only — see `files.routes.ts`'s doc comment;
+no S3/GCS provider is wired up, same constraint as payments' "no
+outbound network" limitation). `ProjectTask` has routes
+(`POST /projects/:id/tasks`, `PATCH /tasks/:id`) but no dedicated mobile
+screen yet. Agreements module (schema exists; no routes/screens).
 
 ## P4 — Financial System: ✅ written, not executed — prioritized per your explicit scope
 
@@ -136,12 +171,43 @@ real provider configuration, not something to fake). Receipt PDF
 generation (a `Receipt` row is created; rendering it as a downloadable PDF
 is not built).
 
-## P5 — Team & Support: 📋 schema only
+## P5 — Team & Support: ✅ implemented and integration-tested (dispatcher excepted)
 
-`SupportTicket`/`TicketMessage`, `Notification`/`DeviceToken`/
-`NotificationPreference`, and the full staff-role schema exist. Staff
-screens beyond organization approval, support ticket routes/screens, and
-the push/email notification dispatcher are not built.
+`SupportTicket`/`TicketMessage` and `Notification`/`DeviceToken`/
+`NotificationPreference` now have real route handlers
+(`apps/api/src/modules/support/tickets.routes.ts`,
+`apps/api/src/modules/notifications/notifications.routes.ts`,
+`apps/api/src/plugins/notify.ts`) and real mobile screens:
+
+- **Tickets** (`tickets/index.tsx`, `tickets/[id].tsx`, `tickets/new.tsx`):
+  a client raises a ticket and replies in it; staff see the full queue
+  across every organization, assign to themselves, reply, and
+  resolve/close. Reached from Profile (no separate tab — see
+  `projects/[id].tsx`'s note on sharing screens between client and staff).
+- **Notifications** (`notifications/index.tsx`): list, unread indicator,
+  mark-one / mark-all-read. Wired into the quote-sent, project-created,
+  project-status-changed, deliverable-submitted/approved/revision-requested,
+  project-message, ticket-created/replied/resolved flows via
+  `plugins/notify.ts`'s `notifyUser`/`notifyOrganization`/`notifyProjectStaff`/`notifyStaffRole`
+  helpers.
+
+**Verified end-to-end** by the same integration test as P3: client raises
+a ticket → it appears in the support staff's queue → staff assigns and
+replies (ticket → `AWAITING_CLIENT`) → client replies (ticket →
+`IN_PROGRESS`) → staff resolves (client notified) → client's unread count
+reflects it → mark-all-read zeroes it.
+
+**Not implemented:** the actual push/email dispatcher. Every notification
+is reliably written to the `Notification` table (so nothing is silently
+dropped and the in-app list is always correct) and `DeviceToken`/
+`NotificationPreference` have working CRUD routes specifically so a
+dispatcher is a single well-defined addition later — but there's no
+outbound network to a push gateway or email/SMTP provider in this
+sandbox to actually send one. Staff screens beyond tickets/projects
+(e.g. a dedicated client-management console) are not built — staff use
+the same client-facing screens with extra actions rather than a separate
+admin surface; a dedicated ops dashboard was judged out of scope for a
+client-facing mobile app and is noted here rather than silently skipped.
 
 ## P6 — Production: not started
 
@@ -150,25 +216,39 @@ be) performed. See the checklist in `docs/deployment.md`.
 
 ## Remaining work, roughly in priority order
 
-1. Run `pnpm install` somewhere with network access (your machine or CI)
-   and fix whatever the first real `pnpm typecheck` turns up — treat this
-   as expected, not a sign anything is wrong; it's the first time these
-   files meet a real TypeScript compiler.
-2. Generate the first Prisma migration against a real Postgres instance
-   and confirm the schema actually applies cleanly.
+1. ~~Run `pnpm install` somewhere with network access and fix whatever
+   `pnpm typecheck` turns up~~ — done, CI is green on `main`.
+2. ~~Generate the first Prisma migration against a real Postgres
+   instance~~ — done, `db:migrate:deploy` runs against CI's postgres
+   service on every push.
 3. Get real Razorpay test-mode keys and walk the full payment sequence by
    hand (create invoice → pay → confirm → trigger a test webhook from the
-   Razorpay dashboard) before writing integration tests against it.
+   Razorpay dashboard). Still not done — needs real credentials, which is
+   explicitly a "your move" step (see the sandbox/test-defaults decision
+   made at project start).
 4. Drop in the real KryptonIX logo + brand font once available.
-5. Build out P3 (projects/messaging/documents/approvals) — the schema and
-   API contract are ready for it.
-6. Build out P5 (support tickets, notifications, staff screens).
-7. Everything in the P6 checklist (`docs/deployment.md`).
+5. ~~Build out P3 (projects/messaging/documents/approvals)~~ — done, see
+   the P3 section above, including real file metadata but not real
+   object storage.
+6. ~~Build out P5 (support tickets, notifications)~~ — done, see the P5
+   section above, except the push/email dispatcher itself.
+7. A real object-storage provider (S3/GCS) behind `files.routes.ts`, so
+   deliverable uploads are real files, not just metadata rows.
+8. A real push/email dispatcher reading `Notification`/`DeviceToken`/
+   `NotificationPreference` (Expo push for mobile, Resend/SMTP for email
+   — `config.ts` already has the env vars reserved for this).
+9. Everything in the P6 checklist (`docs/deployment.md`): security audit,
+   load testing, app store submission prep. Not started.
 
 ## Next phase
 
-Once this is pushed and you've run `pnpm install` + CI passes, the next
-concrete unit of work is **P3: Projects & Milestones** — it's what makes
-the "Pending Approval → Active Project" flow after a quote is accepted
-actually show something in the app, and it's a prerequisite for messaging
-and deliverable approvals.
+P1–P5 all have real route handlers, real mobile screens, and CI-verified
+tests (unit tests for `packages/shared`'s pure logic, a real Postgres
+integration test for `apps/api`'s routes). What's left to turn this into
+something you could actually ship is infrastructure, not app logic:
+real Razorpay credentials, real object storage, a real push/email
+dispatcher, and the P6 production checklist — then running the Expo app
+on a real device (`pnpm install`, `db:migrate`, `db:seed`, `dev:api`,
+`dev:mobile` + Expo Go or an EAS dev build for the Razorpay-dependent
+payment screen, per the walkthrough already given earlier in this
+project's history).

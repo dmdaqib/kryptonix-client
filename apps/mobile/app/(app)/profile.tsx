@@ -1,4 +1,5 @@
-import { Text, View } from "react-native";
+import { Text, View, Pressable } from "react-native";
+import { router } from "expo-router";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { Card } from "../../src/components/Card";
 import { Button } from "../../src/components/Button";
@@ -27,6 +28,17 @@ export default function ProfileScreen() {
           </View>
         </Card>
       ))}
+
+      <Pressable onPress={() => router.push("/(app)/notifications")}>
+        <Card style={{ marginBottom: spacing.sm }}>
+          <Text style={[typography.body, { color: theme.textPrimary }]}>Notifications</Text>
+        </Card>
+      </Pressable>
+      <Pressable onPress={() => router.push("/(app)/tickets")}>
+        <Card style={{ marginBottom: spacing.sm }}>
+          <Text style={[typography.body, { color: theme.textPrimary }]}>Support tickets</Text>
+        </Card>
+      </Pressable>
 
       <View style={{ marginTop: spacing.lg }}>
         <Button label="Sign Out" variant="secondary" onPress={logout} />
