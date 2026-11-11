@@ -1,7 +1,13 @@
 import Constants from "expo-constants";
 import { secureStorage } from "./secure-storage";
 
-const API_BASE_URL = (Constants.expoConfig?.extra?.apiBaseUrl as string) ?? "http://localhost:4000";
+// EXPO_PUBLIC_API_BASE_URL (from apps/mobile/.env, gitignored) lets each developer point
+// the app at their own machine's LAN IP during local development, without touching the
+// committed production default in app.json's extra.apiBaseUrl.
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  (Constants.expoConfig?.extra?.apiBaseUrl as string) ??
+  "http://localhost:4000";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
