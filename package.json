@@ -1,0 +1,28 @@
+{
+  "name": "kryptonix-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "KryptonIX Client — cross-platform mobile app connecting KryptonIX Digital & AI Solutions with its clients across the full customer lifecycle.",
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "pnpm --filter @kryptonix/api dev",
+    "dev:mobile": "pnpm --filter @kryptonix/mobile start",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "test:api": "pnpm --filter @kryptonix/api test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @kryptonix/api prisma:migrate",
+    "db:migrate:deploy": "pnpm --filter @kryptonix/api prisma:deploy",
+    "db:generate": "pnpm --filter @kryptonix/api prisma:generate",
+    "db:seed": "pnpm --filter @kryptonix/api prisma:seed",
+    "db:studio": "pnpm --filter @kryptonix/api prisma:studio"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

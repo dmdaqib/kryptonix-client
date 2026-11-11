@@ -1,0 +1,15 @@
+import { createContext, useContext, type ReactNode } from "react";
+import { useColorScheme } from "react-native";
+import { lightTheme, darkTheme, type Theme } from "./tokens";
+
+const ThemeContext = createContext<Theme>(lightTheme);
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const scheme = useColorScheme();
+  const theme = scheme === "dark" ? darkTheme : lightTheme;
+  return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>;
+}
+
+export function useTheme(): Theme {
+  return useContext(ThemeContext);
+}
