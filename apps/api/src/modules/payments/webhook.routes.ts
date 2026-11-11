@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@prisma/client";
 import { getPaymentProvider } from "./razorpay.provider.ts";
 import { prisma } from "../../db/prisma.ts";
 import { fromSmallestUnit } from "@kryptonix/shared";
@@ -62,9 +63,13 @@ export async function webhookRoutes(app: FastifyInstance) {
         providerEventId,
         eventType: json.event,
         signatureValid,
-        rawPayload: json,
+        // Prisma's Json input type requires a structurally-generic JSON
+        // object; our webhook body is a specifically-typed interface
+        // (for safety everywhere else it's used), so it needs an explicit
+        // cast here at the one point it crosses into storage.
+        rawPayload: json as unknown as Prisma.InputJsonObject,
       },
-      update: { signatureValid, rawPayload: json },
+      update: { signatureValid, rawPayload: json as unknown as Prisma.InputJsonObject },
     });
 
     if (!signatureValid) {

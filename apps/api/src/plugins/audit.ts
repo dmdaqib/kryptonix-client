@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../db/prisma.ts";
 
 interface AuditEntry {
@@ -24,7 +25,10 @@ export async function recordAudit(entry: AuditEntry) {
       action: entry.action,
       entityType: entry.entityType,
       entityId: entry.entityId,
-      metaJson: entry.metaJson,
+      // Same Json-input cast as the webhook store: `metaJson` is caller-
+      // supplied arbitrary context, intentionally typed as
+      // Record<string, unknown> at the call sites for flexibility.
+      metaJson: entry.metaJson as Prisma.InputJsonValue | undefined,
       ipAddress: entry.ipAddress,
     },
   });
