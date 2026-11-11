@@ -6,10 +6,18 @@
 // N/r/p are encoded per-hash so parameters can be upgraded later without
 // invalidating existing hashes.
 
-import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 
-const scrypt = promisify(scryptCb);
+// Uses the synchronous scryptSync rather than promisify(scrypt): Node's
+// scrypt has two overloads (with and without an options object before the
+// callback), and @types/node's promisify typing for it only reliably
+// exposes the no-options 3-argument shape — passing { N, r, p } as a 4th
+// argument then fails to typecheck (a real CI-caught error, not a sandbox
+// artifact). scryptSync has a single, unambiguous signature that takes
+// options directly. The cost: this blocks the event loop for ~50-100ms per
+// call. Acceptable for an auth endpoint's request volume; revisit with a
+// worker-thread wrapper if login throughput ever makes that blocking time
+// a bottleneck.
 
 const DEFAULT_N = 16384; // cost factor (2^14)
 const DEFAULT_R = 8;
@@ -22,11 +30,11 @@ export async function hashPassword(plain: string): Promise<string> {
     throw new Error("Password must be at least 8 characters");
   }
   const salt = randomBytes(SALT_BYTES);
-  const derived = (await scrypt(plain, salt, KEY_LENGTH, {
+  const derived = scryptSync(plain, salt, KEY_LENGTH, {
     N: DEFAULT_N,
     r: DEFAULT_R,
     p: DEFAULT_P,
-  })) as Buffer;
+  });
 
   return [
     "scrypt",
@@ -59,11 +67,7 @@ export async function verifyPassword(
   const salt = Buffer.from(saltHex, "hex");
   const expected = Buffer.from(hashHex, "hex");
 
-  const derived = (await scrypt(plain, salt, expected.length, {
-    N,
-    r,
-    p,
-  })) as Buffer;
+  const derived = scryptSync(plain, salt, expected.length, { N, r, p });
 
   if (derived.length !== expected.length) return false;
   return timingSafeEqual(derived, expected);
