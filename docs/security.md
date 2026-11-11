@@ -89,6 +89,14 @@ is append-only — nothing updates or deletes an `AuditLog` row.
 
 ## Known gaps before production
 
+- [ ] `nextInvoiceNumber()` / `nextQuoteNumber()` (count-and-increment) have
+      a theoretical race under concurrent creation — two requests in the
+      same millisecond could compute the same number. The `@unique`
+      constraint on `invoiceNumber`/`quoteNumber` means a collision fails
+      loudly (Prisma `P2002`) rather than silently duplicating, but it
+      should be replaced with a Postgres sequence or an advisory lock
+      before invoice volume makes the race likely in practice.
+
 - [ ] Move login-lockout counters to Redis (or equivalent shared store)
 - [ ] Implement signed-URL file upload/download
 - [ ] Add a real e-signature provider if quote/agreement acceptance needs
