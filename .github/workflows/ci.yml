@@ -52,8 +52,18 @@ jobs:
       - name: Generate Prisma client
         run: pnpm db:generate
 
-      - name: Run database migrations
-        run: pnpm db:migrate:deploy
+      # `prisma migrate deploy` only applies *existing* migration SQL
+      # files, and this repo has none yet — it was built in a sandbox
+      # with no database network access, so `prisma migrate dev` (which
+      # needs a live DB to diff against) could never be run to generate
+      # one. `db push` syncs the schema straight onto the database
+      # instead, which is exactly what CI (and any fresh clone, before a
+      # real migration history exists) needs. Switch this to
+      # `pnpm db:migrate:deploy` once someone has run `pnpm db:migrate`
+      # against a real Postgres and committed the resulting
+      # prisma/migrations directory.
+      - name: Sync database schema (no migration history yet — see comment)
+        run: pnpm db:push
 
       - name: Typecheck
         run: pnpm typecheck

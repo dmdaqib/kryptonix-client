@@ -218,9 +218,14 @@ be) performed. See the checklist in `docs/deployment.md`.
 
 1. ~~Run `pnpm install` somewhere with network access and fix whatever
    `pnpm typecheck` turns up~~ — done, CI is green on `main`.
-2. ~~Generate the first Prisma migration against a real Postgres
-   instance~~ — done, `db:migrate:deploy` runs against CI's postgres
-   service on every push.
+2. Generate the first real Prisma migration against a real Postgres
+   instance — **still not done**. `prisma migrate dev` needs a live
+   database to diff against, which this sandbox never had, so
+   `prisma/migrations/` doesn't exist. CI currently uses `pnpm db:push`
+   (`prisma db push`, no migration file, no history) to get a working
+   schema for tests — see `docs/deployment.md` for why that's fine for
+   CI but not for production, and the one-command fix once you have
+   real DB access.
 3. Get real Razorpay test-mode keys and walk the full payment sequence by
    hand (create invoice → pay → confirm → trigger a test webhook from the
    Razorpay dashboard). Still not done — needs real credentials, which is

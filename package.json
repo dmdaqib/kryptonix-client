@@ -18,6 +18,7 @@
     "typecheck": "pnpm -r typecheck",
     "db:migrate": "pnpm --filter @kryptonix/api prisma:migrate",
     "db:migrate:deploy": "pnpm --filter @kryptonix/api prisma:deploy",
+    "db:push": "pnpm --filter @kryptonix/api prisma:push",
     "db:generate": "pnpm --filter @kryptonix/api prisma:generate",
     "db:seed": "pnpm --filter @kryptonix/api prisma:seed",
     "db:studio": "pnpm --filter @kryptonix/api prisma:studio"

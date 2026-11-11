@@ -7,9 +7,25 @@ Any Node 20+ host works (Fly.io, Railway, Render, a plain VM, ECS, etc.).
 ```bash
 pnpm install
 pnpm db:generate
-pnpm db:migrate:deploy   # prisma migrate deploy — safe for production
+pnpm db:migrate:deploy   # prisma migrate deploy — once a real migration history exists (see below)
 pnpm --filter @kryptonix/api start
 ```
+
+**No migration history exists yet.** This repo's schema was designed
+without any database network access (see `PROGRESS.md`), so
+`prisma migrate dev` — which needs a live database to diff against —
+was never run, and `prisma/migrations/` doesn't exist. CI and any fresh
+clone currently use `pnpm db:push` (`prisma db push`) instead, which
+syncs the schema straight onto the database with no migration file.
+That's fine for CI and for getting a dev database running quickly, but
+it is **not** a substitute for real migrations in production: `db push`
+has no history to review, can't be rolled back, and will prompt
+destructively on a schema change that would lose data. Before deploying
+anywhere real: run `pnpm db:migrate` once against a real (even empty)
+Postgres instance to generate the initial migration, commit the
+resulting `prisma/migrations/` directory, and switch CI's "Sync database
+schema" step in `.github/workflows/ci.yml` back to
+`pnpm db:migrate:deploy`.
 
 There's no separate compiled `dist/` output — `start` runs the TypeScript
 source directly via Node 22's built-in type-stripping
