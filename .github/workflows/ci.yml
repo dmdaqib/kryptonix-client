@@ -61,8 +61,5 @@ jobs:
       - name: Unit tests (packages/shared)
         run: pnpm --filter @kryptonix/shared test
 
-      - name: Build API
-        run: pnpm --filter @kryptonix/api build
-
       - name: Mobile typecheck
         run: pnpm --filter @kryptonix/mobile typecheck

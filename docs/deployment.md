@@ -8,9 +8,21 @@ Any Node 20+ host works (Fly.io, Railway, Render, a plain VM, ECS, etc.).
 pnpm install
 pnpm db:generate
 pnpm db:migrate:deploy   # prisma migrate deploy — safe for production
-pnpm --filter @kryptonix/api build
 pnpm --filter @kryptonix/api start
 ```
+
+There's no separate compiled `dist/` output — `start` runs the TypeScript
+source directly via Node 22's built-in type-stripping
+(`node --experimental-strip-types`), the same way `dev` runs it through
+`tsx`. This was a deliberate choice once the whole repo's relative imports
+used explicit `.ts` extensions (needed for `node --experimental-strip-types`
+and for running `packages/shared`'s tests with zero dependencies — see
+`PROGRESS.md`): emitting real `.js` via `tsc` while keeping `.ts` extensions
+in the source needs TypeScript 5.7's `rewriteRelativeImportExtensions`,
+which added more moving parts than it was worth versus just running the
+source directly on a Node version that supports it natively. `pnpm --filter
+@kryptonix/api build` still exists as a type-check-only sanity command
+(`tsc --noEmit`), it just doesn't produce an artifact.
 
 Required env vars: everything in `.env.example` with no default — at
 minimum `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`,

@@ -23,8 +23,13 @@ export interface JwtPayload {
   role: string; // "CLIENT" | "STAFF"
   iat: number;
   exp: number;
-  [key: string]: unknown;
 }
+// Deliberately no index signature here: with one present, `keyof JwtPayload`
+// collapses to `string` and `Omit<JwtPayload, "iat" | "exp">` below stops
+// requiring sub/sid/role — a real bug CI's typecheck caught, not a
+// sandbox artifact. If arbitrary extra claims are ever needed, add a
+// separate `extra?: Record<string, unknown>` field instead of widening this
+// via an index signature.
 
 export function signJwt(
   payload: Omit<JwtPayload, "iat" | "exp">,
