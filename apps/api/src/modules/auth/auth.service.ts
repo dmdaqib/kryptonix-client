@@ -64,7 +64,14 @@ export async function registerClient(input: RegisterInput, ipAddress?: string) {
         passwordHash,
         fullName: input.fullName,
         userType: "CLIENT",
-        status: "PENDING_EMAIL_VERIFICATION",
+        // Email verification is skipped for now (no real email provider is
+        // wired up yet — see apps/api/src/services/email.ts). Accounts go
+        // straight to PENDING_APPROVAL, which already allows sign-in while
+        // showing the client a "pending KryptonIX approval" state. Re-enable
+        // PENDING_EMAIL_VERIFICATION + issueEmailVerification(...) below once
+        // a real EMAIL_PROVIDER is configured.
+        status: "PENDING_APPROVAL",
+        emailVerifiedAt: new Date(),
       },
     });
 
@@ -74,8 +81,6 @@ export async function registerClient(input: RegisterInput, ipAddress?: string) {
 
     return { user, organization };
   });
-
-  await issueEmailVerification(user.id, user.email);
 
   await recordAudit({
     organizationId: organization.id,
