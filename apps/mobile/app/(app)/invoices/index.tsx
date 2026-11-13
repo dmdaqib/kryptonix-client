@@ -1,13 +1,16 @@
-import { FlatList, Text, Pressable, View } from "react-native";
+import { FlatList, Text, Pressable, View, StyleSheet } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
 import { Card } from "../../../src/components/Card";
 import { EmptyState } from "../../../src/components/EmptyState";
+import { StatusPill } from "../../../src/components/StatusPill";
 import { useAuthStore } from "../../../src/stores/auth-store";
 import { apiRequest } from "../../../src/lib/api-client";
+import { formatCurrency } from "../../../src/lib/format";
 import { useTheme } from "../../../src/theme/ThemeProvider";
-import { spacing, typography } from "../../../src/theme/tokens";
+import { colors, radii, spacing, typography } from "../../../src/theme/tokens";
 
 interface Invoice {
   id: string;
@@ -17,15 +20,6 @@ interface Invoice {
   status: string;
   dueDate: string;
 }
-
-const STATUS_COLOR: Record<string, "textSecondary" | "success" | "warning" | "danger"> = {
-  PAID: "success",
-  PARTIALLY_PAID: "warning",
-  SENT: "textSecondary",
-  OVERDUE: "danger",
-  DRAFT: "textSecondary",
-  VOID: "textSecondary",
-};
 
 export default function InvoicesScreen() {
   const theme = useTheme();
@@ -43,29 +37,45 @@ export default function InvoicesScreen() {
       <FlatList
         data={invoices ?? []}
         keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           !isLoading ? (
             <EmptyState title="No invoices yet" description="Invoices will appear here once KryptonIX issues one." />
           ) : null
         }
-        ItemSeparatorComponent={() => <Text style={{ height: spacing.sm }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         renderItem={({ item }) => {
           const outstanding = Number(item.totalAmount) - Number(item.amountPaid);
-          const statusKey = STATUS_COLOR[item.status] ?? "textSecondary";
+          const paid = item.status === "PAID";
           return (
             <Pressable onPress={() => router.push(`/(app)/invoices/${item.id}`)}>
-              <Card>
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Card style={styles.row}>
+                <View
+                  style={[
+                    styles.icon,
+                    { backgroundColor: paid ? `${theme.success}1F` : colors.neutral100 },
+                  ]}
+                >
+                  <Ionicons
+                    name={paid ? "checkmark-done" : "receipt-outline"}
+                    size={20}
+                    color={paid ? theme.success : theme.textSecondary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>{item.invoiceNumber}</Text>
-                  <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>
-                    ₹{Number(item.totalAmount).toLocaleString("en-IN")}
+                  <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                    Due {new Date(item.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                   </Text>
                 </View>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: spacing.xs }}>
-                  <Text style={[typography.caption, { color: theme[statusKey] }]}>{item.status}</Text>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>
+                    {formatCurrency(item.totalAmount)}
+                  </Text>
+                  <StatusPill status={item.status} />
                   {outstanding > 0 ? (
-                    <Text style={[typography.caption, { color: theme.textSecondary }]}>
-                      ₹{outstanding.toLocaleString("en-IN")} due
+                    <Text style={[typography.small, { color: theme.textSecondary }]}>
+                      {formatCurrency(outstanding)} due
                     </Text>
                   ) : null}
                 </View>
@@ -77,3 +87,18 @@ export default function InvoicesScreen() {
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  icon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

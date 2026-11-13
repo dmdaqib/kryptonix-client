@@ -40,7 +40,17 @@ export async function catalogueRoutes(app: FastifyInstance) {
     const { categoryId } = z.object({ categoryId: z.string().cuid().optional() }).parse(request.query);
     const services = await prisma.service.findMany({
       where: { isActive: true, ...(categoryId ? { categoryId } : {}) },
-      include: { category: true },
+      include: {
+        category: true,
+        // Cheapest available package only, so the list can show a
+        // "Starting at ₹X" price without fetching every package's detail.
+        packages: {
+          where: { isAvailable: true },
+          orderBy: { priceAmount: "asc" },
+          take: 1,
+          select: { priceAmount: true, currency: true },
+        },
+      },
     });
     return reply.send({ data: services });
   });

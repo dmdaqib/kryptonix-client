@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View, StyleSheet } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
 import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
 import { TextField } from "../../../src/components/TextField";
 import { useAuthStore } from "../../../src/stores/auth-store";
 import { apiRequest } from "../../../src/lib/api-client";
+import { formatCurrency } from "../../../src/lib/format";
 import { useTheme } from "../../../src/theme/ThemeProvider";
-import { spacing, typography } from "../../../src/theme/tokens";
+import { radii, spacing, typography } from "../../../src/theme/tokens";
 
 interface ServicePackage {
   id: string;
@@ -56,26 +58,62 @@ export default function ServiceDetailScreen() {
 
   if (!service) return null;
 
+  const onlyOnePackage = service.packages.length === 1;
+
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={[typography.h2, { color: theme.textPrimary }]}>{service.name}</Text>
-        <Text style={[typography.body, { color: theme.textSecondary, marginVertical: spacing.sm }]}>
+        <Text style={[typography.body, { color: theme.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg }]}>
           {service.description}
         </Text>
 
         {service.packages.map((pkg) => (
           <Card key={pkg.id} style={{ marginBottom: spacing.md }}>
-            <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>{pkg.name}</Text>
-            <Text style={[typography.h3, { color: theme.primary, marginVertical: spacing.xs }]}>
-              ₹{Number(pkg.priceAmount).toLocaleString("en-IN")}
-            </Text>
-            <Text style={[typography.body, { color: theme.textSecondary }]}>{pkg.description}</Text>
-            {pkg.features.map((f) => (
-              <Text key={f.id} style={[typography.caption, { color: theme.textSecondary }]}>
-                {f.included ? "✓" : "✗"} {f.label}
+            <View style={styles.packageHeader}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.titleRow}>
+                  <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>{pkg.name}</Text>
+                  {onlyOnePackage ? (
+                    <View style={[styles.badge, { backgroundColor: theme.primary }]}>
+                      <Text style={[typography.small, { color: theme.primaryText, fontWeight: "700" }]}>RECOMMENDED</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {pkg.expectedDurationDays ? (
+                  <View style={styles.metaRow}>
+                    <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+                    <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                      ~{pkg.expectedDurationDays} days
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[typography.h3, { color: theme.primary }]}>
+                {formatCurrency(pkg.priceAmount, pkg.currency)}
               </Text>
+            </View>
+
+            <Text style={[typography.body, { color: theme.textSecondary, marginTop: spacing.sm }]}>
+              {pkg.description}
+            </Text>
+
+            {pkg.features.length > 0 ? (
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            ) : null}
+            {pkg.features.map((f) => (
+              <View key={f.id} style={styles.featureRow}>
+                <Ionicons
+                  name={f.included ? "checkmark-circle" : "close-circle-outline"}
+                  size={18}
+                  color={f.included ? theme.success : theme.textSecondary}
+                />
+                <Text style={[typography.body, { color: f.included ? theme.textPrimary : theme.textSecondary }]}>
+                  {f.label}
+                </Text>
+              </View>
             ))}
+
             <View style={{ marginTop: spacing.md }}>
               <Button label="Request this package" variant="secondary" onPress={() => setShowEnquiry(true)} />
             </View>
@@ -104,3 +142,39 @@ export default function ServiceDetailScreen() {
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  packageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radii.full,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    marginVertical: spacing.md,
+  },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: 4,
+  },
+});
