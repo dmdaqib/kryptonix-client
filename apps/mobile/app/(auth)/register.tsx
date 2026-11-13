@@ -7,13 +7,17 @@ import { Button } from "../../src/components/Button";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { spacing, typography } from "../../src/theme/tokens";
 import { apiRequest, ApiError } from "../../src/lib/api-client";
+import { useAuthStore } from "../../src/stores/auth-store";
 
 // Collects exactly the fields the spec calls for: full name, email, phone,
 // business name, business category, business website, country and
-// service interests. Submitting creates the account AND its organization;
-// KryptonIX approval (pending-approval screen) comes after email verify.
+// service interests. Submitting creates the account AND its organization,
+// then signs the user straight in — email verification is skipped for now
+// (see apps/api/src/modules/auth/auth.service.ts), so there's no separate
+// verify-email step to send them to.
 export default function RegisterScreen() {
   const theme = useTheme();
+  const login = useAuthStore((s) => s.login);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -36,7 +40,8 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await apiRequest("/api/v1/auth/register", { method: "POST", body: form, auth: false });
-      router.push({ pathname: "/(auth)/verify-email", params: { email: form.email } });
+      await login(form.email.trim().toLowerCase(), form.password);
+      router.replace("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not create account. Please try again.");
     } finally {
