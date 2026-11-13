@@ -58,6 +58,17 @@ export function registerErrorHandler(app: FastifyInstance) {
       });
     }
 
+    // Fastify's own framework-level errors (malformed JSON body, payload too
+    // large, unsupported content-type, etc.) carry a real statusCode/code of
+    // their own and are safe to pass through as-is — only truly unexpected
+    // (likely 5xx) errors should be flattened to a generic message.
+    const fastifyStatus = (error as { statusCode?: number }).statusCode;
+    if (typeof fastifyStatus === "number" && fastifyStatus >= 400 && fastifyStatus < 500) {
+      return reply.status(fastifyStatus).send({
+        error: { code: (error as { code?: string }).code ?? "BAD_REQUEST", message: error.message },
+      });
+    }
+
     request.log.error({ err: error }, "Unhandled error");
     // Never leak internals in the response — log the real error, return a
     // generic message to the client.
