@@ -6,6 +6,13 @@ import { hashPassword } from "../packages/shared/src/security/password.ts";
 
 const prisma = new PrismaClient();
 
+function daysAgo(n: number) {
+  return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+}
+function addDays(n: number) {
+  return new Date(Date.now() + n * 24 * 60 * 60 * 1000);
+}
+
 async function main() {
   console.log("Seeding service catalogue from kryptonix.digital's real service lines...");
 
@@ -204,14 +211,14 @@ async function main() {
   }
 
   console.log("Seeding a sandbox Super Admin staff account...");
-  const passwordHash = await hashPassword("ChangeMe123!");
-  await prisma.user.upsert({
+  const adminPasswordHash = await hashPassword("ChangeMe123!");
+  const admin = await prisma.user.upsert({
     where: { email: "admin@kryptonix.digital" },
     update: {},
     create: {
       email: "admin@kryptonix.digital",
       fullName: "KryptonIX Super Admin",
-      passwordHash,
+      passwordHash: adminPasswordHash,
       userType: "STAFF",
       staffRole: "SUPER_ADMIN",
       status: "ACTIVE",
@@ -219,7 +226,338 @@ async function main() {
     },
   });
 
-  console.log("Done. Sandbox login: admin@kryptonix.digital / ChangeMe123! (DEV ONLY — change immediately in any shared environment).");
+  console.log("Seeding a fully populated demo client account...");
+  const demoPasswordHash = await hashPassword("Demo1234!");
+  const demoClient = await prisma.user.upsert({
+    where: { email: "demo@kryptonix.digital" },
+    update: {},
+    create: {
+      email: "demo@kryptonix.digital",
+      phone: "9900011122",
+      fullName: "Aisha Khan",
+      passwordHash: demoPasswordHash,
+      userType: "CLIENT",
+      status: "ACTIVE",
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  // Everything below is keyed off whether this demo user already has an
+  // organization — safe to re-run `pnpm db:seed` any number of times.
+  const alreadySeeded = await prisma.organizationMember.findFirst({
+    where: { userId: demoClient.id },
+  });
+
+  if (!alreadySeeded) {
+    const salonService = await prisma.service.findUnique({
+      where: { slug: "salon-gym-platform" },
+      include: { packages: true },
+    });
+    const salonPackage = salonService?.packages[0];
+
+    const org = await prisma.organization.create({
+      data: {
+        name: "Bloom & Co. Salon",
+        businessCategory: "Salon",
+        website: "https://bloomandco.example.com",
+        country: "India",
+        approvedAt: new Date(),
+        approvedByUserId: admin.id,
+      },
+    });
+
+    await prisma.organizationMember.create({
+      data: { organizationId: org.id, userId: demoClient.id, role: "OWNER" },
+    });
+
+    const enquiry = await prisma.enquiry.create({
+      data: {
+        organizationId: org.id,
+        createdByUserId: demoClient.id,
+        serviceId: salonService?.id,
+        title: "Online booking + membership system for our salon chain",
+        requirements:
+          "We run 2 salon locations and need online appointment booking, staff rosters and " +
+          "membership/package tracking in one place, with a simple app our clients can book from.",
+        budgetRangeMin: 40000,
+        budgetRangeMax: 60000,
+        expectedTimeline: "4-6 weeks",
+        status: "CONVERTED",
+      },
+    });
+
+    let quote: { id: string } | null = null;
+    if (salonPackage) {
+      const subtotal = salonPackage.priceAmount;
+      const tax = Number(subtotal) * 0.18;
+      const total = Number(subtotal) + tax;
+
+      quote = await prisma.quote.create({
+        data: {
+          organizationId: org.id,
+          enquiryId: enquiry.id,
+          createdByUserId: admin.id,
+          quoteNumber: "Q-DEMO-0001",
+          status: "ACCEPTED",
+          scopeOfWork: salonService!.description,
+          subtotalAmount: subtotal,
+          taxAmount: tax,
+          totalAmount: total,
+          paymentTerms: "50% upfront, 50% on delivery",
+          validUntil: addDays(14),
+          sentAt: daysAgo(10),
+          viewedAt: daysAgo(9),
+          items: {
+            create: [
+              {
+                packageId: salonPackage.id,
+                description: `${salonService!.name} — ${salonPackage.name}`,
+                quantity: 1,
+                unitPrice: subtotal,
+                lineTotal: subtotal,
+              },
+            ],
+          },
+        },
+      });
+
+      await prisma.quoteAcceptance.create({
+        data: {
+          quoteId: quote.id,
+          acceptedByUserId: demoClient.id,
+          acceptedQuoteVersion: 1,
+          acceptedAt: daysAgo(8),
+        },
+      });
+    }
+
+    const project = await prisma.project.create({
+      data: {
+        organizationId: org.id,
+        quoteId: quote?.id,
+        name: "Bloom & Co. — Salon & Gym Management Platform",
+        description: "Online booking, staff scheduling and membership tracking for 2 salon locations.",
+        serviceCategory: "salon-gym-software",
+        status: "IN_PROGRESS",
+        startDate: daysAgo(7),
+        expectedDeliveryDate: addDays(14),
+      },
+    });
+
+    await prisma.projectMember.createMany({
+      data: [
+        { projectId: project.id, userId: demoClient.id, isManager: false },
+        { projectId: project.id, userId: admin.id, isManager: true },
+      ],
+    });
+
+    const discoveryMilestone = await prisma.milestone.create({
+      data: {
+        projectId: project.id,
+        name: "Discovery & Design",
+        description: "Requirements workshop, information architecture and UI wireframes.",
+        startDate: daysAgo(7),
+        dueDate: daysAgo(2),
+        status: "COMPLETED",
+        requiresClientApproval: true,
+      },
+    });
+
+    const wireframesFile = await prisma.file.create({
+      data: {
+        organizationId: org.id,
+        projectId: project.id,
+        uploadedByUserId: admin.id,
+        category: "deliverable",
+        originalName: "bloom-co-wireframes-v1.pdf",
+        storageKey: "seed/demo/bloom-co-wireframes-v1.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 248_000,
+        visibility: "CLIENT_VISIBLE",
+      },
+    });
+
+    const deliverable = await prisma.deliverable.create({
+      data: {
+        milestoneId: discoveryMilestone.id,
+        fileId: wireframesFile.id,
+        submittedByUserId: admin.id,
+        submittedAt: daysAgo(3),
+      },
+    });
+
+    await prisma.approval.create({
+      data: {
+        deliverableId: deliverable.id,
+        decidedByUserId: demoClient.id,
+        decision: "APPROVED",
+        feedback: "Looks great — approved to move into build.",
+        decidedAt: daysAgo(2),
+      },
+    });
+
+    const buildMilestone = await prisma.milestone.create({
+      data: {
+        projectId: project.id,
+        name: "Booking & Membership Build",
+        description: "Build the booking flow, staff scheduling and membership/package tracking.",
+        startDate: daysAgo(2),
+        dueDate: addDays(12),
+        status: "IN_PROGRESS",
+        requiresClientApproval: true,
+      },
+    });
+
+    await prisma.projectTask.createMany({
+      data: [
+        { projectId: project.id, milestoneId: buildMilestone.id, title: "Build staff scheduling module", status: "IN_PROGRESS" },
+        { projectId: project.id, milestoneId: buildMilestone.id, title: "Integrate online booking widget", status: "TODO" },
+        { projectId: project.id, milestoneId: buildMilestone.id, title: "Membership/package tracking screens", status: "TODO" },
+      ],
+    });
+
+    await prisma.projectUpdate.create({
+      data: {
+        projectId: project.id,
+        authorId: admin.id,
+        body: "Kickoff call completed and wireframes approved — the build phase is now underway.",
+        createdAt: daysAgo(2),
+      },
+    });
+
+    const conversation = await prisma.conversation.create({
+      data: { projectId: project.id, title: "Project Chat" },
+    });
+    await prisma.conversationMember.createMany({
+      data: [
+        { conversationId: conversation.id, userId: demoClient.id },
+        { conversationId: conversation.id, userId: admin.id },
+      ],
+    });
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: admin.id,
+        body: "Welcome! We'll keep all project updates and files here.",
+        createdAt: daysAgo(7),
+      },
+    });
+
+    if (quote && salonPackage) {
+      const subtotal = salonPackage.priceAmount;
+      const tax = Number(subtotal) * 0.18;
+      const total = Number(subtotal) + tax;
+
+      const invoice = await prisma.invoice.create({
+        data: {
+          organizationId: org.id,
+          projectId: project.id,
+          quoteId: quote.id,
+          invoiceNumber: "INV-DEMO-0001",
+          status: "PAID",
+          issueDate: daysAgo(7),
+          dueDate: daysAgo(0),
+          subtotalAmount: subtotal,
+          taxAmount: tax,
+          totalAmount: total,
+          amountPaid: total,
+          paymentTerms: "50% upfront, 50% on delivery",
+          items: {
+            create: [
+              {
+                description: `${salonService!.name} — ${salonPackage.name}`,
+                quantity: 1,
+                unitPrice: subtotal,
+                taxPercent: 18,
+                lineTotal: subtotal,
+              },
+            ],
+          },
+        },
+      });
+
+      const payment = await prisma.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          provider: "razorpay",
+          providerOrderId: "order_demo_0001",
+          providerPaymentId: "pay_demo_0001",
+          amount: total,
+          method: "upi",
+          status: "SUCCEEDED",
+          recordedByUserId: admin.id,
+          createdAt: daysAgo(6),
+        },
+      });
+
+      await prisma.receipt.create({
+        data: { paymentId: payment.id, receiptNumber: "RCPT-DEMO-0001" },
+      });
+    }
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        organizationId: org.id,
+        openedByUserId: demoClient.id,
+        assignedToUserId: admin.id,
+        category: "Billing",
+        subject: "Question about the next payment",
+        description: "When is the remaining balance due, and can I pay by card instead of UPI?",
+        status: "AWAITING_CLIENT",
+        priority: "NORMAL",
+        createdAt: daysAgo(1),
+      },
+    });
+    await prisma.ticketMessage.createMany({
+      data: [
+        {
+          ticketId: ticket.id,
+          authorId: demoClient.id,
+          body: "When is the remaining balance due, and can I pay by card instead of UPI?",
+          createdAt: daysAgo(1),
+        },
+        {
+          ticketId: ticket.id,
+          authorId: admin.id,
+          body: "The remaining balance is due on project completion, and yes — card payments work too.",
+          createdAt: daysAgo(1),
+        },
+      ],
+    });
+
+    await prisma.notification.createMany({
+      data: [
+        {
+          userId: demoClient.id,
+          type: "project.milestone_approved",
+          title: "Milestone approved",
+          body: "Discovery & Design was approved — build has started.",
+          readAt: daysAgo(2),
+          createdAt: daysAgo(2),
+        },
+        {
+          userId: demoClient.id,
+          type: "payment.succeeded",
+          title: "Payment received",
+          body: "We received your payment of ₹53,100 for invoice INV-DEMO-0001.",
+          readAt: daysAgo(6),
+          createdAt: daysAgo(6),
+        },
+        {
+          userId: demoClient.id,
+          type: "ticket.reply",
+          title: "New reply on your support ticket",
+          body: "KryptonIX Support replied to \"Question about the next payment\".",
+          createdAt: daysAgo(1),
+        },
+      ],
+    });
+  }
+
+  console.log("Done.");
+  console.log("Sandbox admin login: admin@kryptonix.digital / ChangeMe123!");
+  console.log("Fully populated demo client login: demo@kryptonix.digital / Demo1234!");
+  console.log("(DEV ONLY — change these immediately in any shared environment.)");
 }
 
 main()
