@@ -198,7 +198,9 @@ test("commerce: purchase package with KRYPTON10 discount and 50% advance schedul
   assert.ok(updatedInvoice);
   assert.equal(updatedInvoice.status, "PAID");
   assert.ok(updatedInvoice.payments.length > 0);
-  assert.equal(updatedInvoice.payments[0].status, "SUCCEEDED");
-  assert.ok(updatedInvoice.payments[0].receipt);
-  assert.ok(updatedInvoice.payments[0].receipt.receiptNumber.startsWith("KX-RCPT-"));
+  const payment = updatedInvoice.payments[0];
+  assert.ok(payment);
+  assert.equal(payment.status, "SUCCEEDED");
+  assert.ok(payment.receipt);
+  assert.ok(payment.receipt.receiptNumber.startsWith("KX-RCPT-"));
 });
