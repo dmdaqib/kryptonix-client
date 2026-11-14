@@ -1,11 +1,13 @@
+import React, { forwardRef } from "react";
 import { View, type ViewProps, StyleSheet } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing } from "../theme/tokens";
 
-export function Card({ style, ...props }: ViewProps) {
+export const Card = forwardRef<View, ViewProps>(function Card({ style, ...props }, ref) {
   const theme = useTheme();
   return (
     <View
+      ref={ref}
       style={[
         styles.card,
         { backgroundColor: theme.card, borderColor: theme.border },
@@ -14,7 +16,9 @@ export function Card({ style, ...props }: ViewProps) {
       {...props}
     />
   );
-}
+});
+
+Card.displayName = "Card";
 
 const styles = StyleSheet.create({
   card: {

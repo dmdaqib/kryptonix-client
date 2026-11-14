@@ -1,3 +1,4 @@
+import React, { forwardRef } from "react";
 import {
   Pressable,
   Text,
@@ -6,11 +7,13 @@ import {
   type GestureResponderEvent,
   type StyleProp,
   type ViewStyle,
+  type View,
+  type PressableProps,
 } from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing, typography } from "../theme/tokens";
 
-interface ButtonProps {
+export interface ButtonProps extends Omit<PressableProps, "style" | "children"> {
   label: string;
   onPress?: (e: GestureResponderEvent) => void;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
@@ -21,16 +24,20 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function Button({
-  label,
-  onPress,
-  variant = "primary",
-  size = "md",
-  loading,
-  disabled,
-  fullWidth = true,
-  style,
-}: ButtonProps) {
+export const Button = forwardRef<View, ButtonProps>(function Button(
+  {
+    label,
+    onPress,
+    variant = "primary",
+    size = "md",
+    loading,
+    disabled,
+    fullWidth = true,
+    style,
+    ...rest
+  },
+  ref
+) {
   const theme = useTheme();
 
   const isOutline = variant === "outline";
@@ -56,8 +63,9 @@ export function Button({
 
   return (
     <Pressable
+      ref={ref}
       accessibilityRole="button"
-      accessibilityState={{ disabled: disabled || loading }}
+      accessibilityState={{ disabled: Boolean(disabled || loading), ...rest.accessibilityState }}
       onPress={disabled || loading ? undefined : onPress}
       style={({ pressed }) => [
         styles.base,
@@ -71,8 +79,9 @@ export function Button({
           borderColor: isOutline ? theme.primary : theme.border,
           width: fullWidth && !style ? "100%" : undefined,
         },
-        style,
+        typeof style === "function" ? (style as (state: { pressed: boolean }) => StyleProp<ViewStyle>)({ pressed }) : style,
       ]}
+      {...rest}
     >
       {loading ? (
         <ActivityIndicator color={textColor} />
@@ -83,7 +92,9 @@ export function Button({
       )}
     </Pressable>
   );
-}
+});
+
+Button.displayName = "Button";
 
 const styles = StyleSheet.create({
   base: {

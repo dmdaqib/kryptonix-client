@@ -98,3 +98,4 @@ export async function storageRoutes(app: FastifyInstance) {
     return reply.send(fs.createReadStream(targetPath));
   });
 }
+
