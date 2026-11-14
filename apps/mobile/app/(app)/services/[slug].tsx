@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ScrollView, Text, View, StyleSheet } from "react-native";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { ScrollView, Text, View, StyleSheet, Alert } from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
@@ -8,7 +8,7 @@ import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
 import { TextField } from "../../../src/components/TextField";
 import { useAuthStore } from "../../../src/stores/auth-store";
-import { apiRequest } from "../../../src/lib/api-client";
+import { apiRequest, ApiError } from "../../../src/lib/api-client";
 import { formatCurrency } from "../../../src/lib/format";
 import { useTheme } from "../../../src/theme/ThemeProvider";
 import { radii, spacing, typography } from "../../../src/theme/tokens";
@@ -39,6 +39,7 @@ export default function ServiceDetailScreen() {
   const theme = useTheme();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { activeOrganizationId } = useAuthStore();
+  const queryClient = useQueryClient();
   const [showEnquiry, setShowEnquiry] = useState(false);
   const [requirements, setRequirements] = useState("");
   const [purchasingPackageId, setPurchasingPackageId] = useState<string | null>(null);
@@ -70,7 +71,18 @@ export default function ServiceDetailScreen() {
         { method: "POST" },
       );
     },
-    onSuccess: (invoice) => router.push(`/(app)/invoices/${invoice.id}`),
+    onSuccess: (invoice) => {
+      // The invoices list and dashboard both cache under this key — without
+      // invalidating it, either screen can keep showing "No invoices yet"
+      // after a successful purchase until something else happens to trigger
+      // a refetch.
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      router.push(`/(app)/invoices/${invoice.id}`);
+    },
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : "Could not start the purchase. Please try again.";
+      Alert.alert("Purchase failed", message);
+    },
     onSettled: () => setPurchasingPackageId(null),
   });
 
