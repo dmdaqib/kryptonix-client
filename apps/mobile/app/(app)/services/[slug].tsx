@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ScrollView, Text, View, StyleSheet, Alert } from "react-native";
+import { ScrollView, Text, View, StyleSheet, Alert, Pressable, ActivityIndicator } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,7 +44,13 @@ export default function ServiceDetailScreen() {
   const [requirements, setRequirements] = useState("");
   const [purchasingPackageId, setPurchasingPackageId] = useState<string | null>(null);
 
-  const { data: service } = useQuery({
+  const {
+    data: service,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["catalogue", "service", slug],
     queryFn: () => apiRequest<ServiceDetail>(`/api/v1/catalogue/services/${slug}`, { auth: false }),
   });
@@ -86,13 +92,48 @@ export default function ServiceDetailScreen() {
     onSettled: () => setPurchasingPackageId(null),
   });
 
-  if (!service) return null;
+  const backButton = (
+    <Pressable
+      onPress={() => router.back()}
+      hitSlop={12}
+      style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: spacing.md }}
+    >
+      <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+      <Text style={[typography.body, { color: theme.textPrimary }]}>Back</Text>
+    </Pressable>
+  );
+
+  if (isLoading) {
+    return (
+      <ScreenContainer>
+        {backButton}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      </ScreenContainer>
+    );
+  }
+
+  if (isError || !service) {
+    const message = error instanceof ApiError ? error.message : "Couldn't load this service.";
+    return (
+      <ScreenContainer>
+        {backButton}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md }}>
+          <Ionicons name="cloud-offline-outline" size={32} color={theme.textSecondary} />
+          <Text style={[typography.body, { color: theme.textSecondary, textAlign: "center" }]}>{message}</Text>
+          <Button label="Try again" variant="secondary" onPress={() => refetch()} />
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   const onlyOnePackage = service.packages.length === 1;
 
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {backButton}
         <Text style={[typography.h2, { color: theme.textPrimary }]}>{service.name}</Text>
         <Text style={[typography.body, { color: theme.textSecondary, marginTop: spacing.xs, marginBottom: spacing.lg }]}>
           {service.description}
