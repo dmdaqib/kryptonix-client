@@ -72,3 +72,6 @@ jobs:
 
       - name: Mobile typecheck
         run: pnpm --filter @kryptonix/mobile typecheck
+
+      - name: Mobile bundle export (Hermes bytecode verification)
+        run: pnpm --filter @kryptonix/mobile exec npx expo export --platform android
