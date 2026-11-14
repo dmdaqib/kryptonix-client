@@ -15,6 +15,7 @@ import { invoiceRoutes } from "./modules/payments/invoices.routes.ts";
 import { paymentRoutes } from "./modules/payments/payments.routes.ts";
 import { refundRoutes } from "./modules/payments/refunds.routes.ts";
 import { webhookRoutes } from "./modules/payments/webhook.routes.ts";
+import { storageRoutes } from "./modules/storage/storage.routes.ts";
 import { projectRoutes } from "./modules/projects/projects.routes.ts";
 import { messagingRoutes } from "./modules/projects/messaging.routes.ts";
 import { fileRoutes } from "./modules/projects/files.routes.ts";
@@ -47,11 +48,12 @@ export async function buildServer() {
 
   app.get("/health", async () => ({ status: "ok", time: new Date().toISOString() }));
 
-  // Webhook routes are registered in their own encapsulated context FIRST
-  // and in isolation, because they install a custom content-type parser
-  // (to capture the raw body for signature verification) that must not
+  // Webhook and storage upload routes are registered in their own encapsulated
+  // contexts FIRST and in isolation, because they install custom content-type
+  // parsers (raw body for webhooks, stream/any for file uploads) that must not
   // leak onto the rest of the API's normal JSON parsing.
   await app.register(webhookRoutes, { prefix: "/api/v1" });
+  await app.register(storageRoutes, { prefix: "/api/v1" });
 
   await app.register(
     async (api) => {

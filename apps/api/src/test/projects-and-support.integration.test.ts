@@ -135,6 +135,67 @@ test("project manager registers a file against the project", async () => {
   assert.ok(downloadRes.json().data.downloadUrl);
 });
 
+test("local storage upload and download endpoints handle binary content correctly", async () => {
+  const presignRes = await app.inject({
+    method: "POST",
+    url: `/api/v1/projects/${projectId}/files/presign`,
+    headers: authHeader(pm),
+    payload: {
+      filename: "test-spec.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 18,
+    },
+  });
+  assert.equal(presignRes.statusCode, 200);
+  const { uploadUrl, storageKey } = presignRes.json().data;
+
+  // Extract path and query from uploadUrl
+  const uploadPath = uploadUrl.replace(/^https?:\/\/[^/]+/, "");
+  const payload = Buffer.from("PDF-1.4 dummy spec");
+
+  // 1. Upload binary payload
+  const putRes = await app.inject({
+    method: "PUT",
+    url: uploadPath,
+    headers: { "Content-Type": "application/pdf" },
+    payload,
+  });
+  assert.equal(putRes.statusCode, 200);
+
+  // 2. Register file
+  const registerRes = await app.inject({
+    method: "POST",
+    url: `/api/v1/projects/${projectId}/files`,
+    headers: authHeader(pm),
+    payload: {
+      category: "SPECIFICATION",
+      originalName: "test-spec.pdf",
+      storageKey,
+      mimeType: "application/pdf",
+      sizeBytes: payload.length,
+    },
+  });
+  assert.equal(registerRes.statusCode, 201);
+  const specFileId = registerRes.json().data.id;
+
+  // 3. Request download URL
+  const downloadRes = await app.inject({
+    method: "GET",
+    url: `/api/v1/projects/${projectId}/files/${specFileId}/download`,
+    headers: authHeader(client),
+  });
+  assert.equal(downloadRes.statusCode, 200);
+  const downloadPath = downloadRes.json().data.downloadUrl.replace(/^https?:\/\/[^/]+/, "");
+
+  // 4. Download file and verify content
+  const getRes = await app.inject({
+    method: "GET",
+    url: downloadPath,
+  });
+  assert.equal(getRes.statusCode, 200);
+  assert.equal(getRes.body, "PDF-1.4 dummy spec");
+});
+
 test("submitting a deliverable moves the milestone to SUBMITTED_FOR_REVIEW and notifies the client", async () => {
   const res = await app.inject({
     method: "POST",

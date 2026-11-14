@@ -2,6 +2,8 @@ node_modules/
 .expo/
 dist/
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
 coverage/
@@ -10,4 +12,7 @@ ios/Pods/
 android/.gradle/
 android/app/build/
 .turbo/
+/storage/
+/apps/api/storage/
+
 
