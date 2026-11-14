@@ -23,30 +23,28 @@ export default function AppTabsLayout() {
         options={{ title: "Dashboard", tabBarIcon: ({ color, focused }) => <TabIcon label="🏠" color={color} focused={focused} /> }}
       />
       <Tabs.Screen
-        name="services/index"
+        name="services"
         options={{ title: "Services", tabBarIcon: ({ color, focused }) => <TabIcon label="🧩" color={color} focused={focused} /> }}
       />
       <Tabs.Screen
-        name="projects/index"
+        name="projects"
         options={{ title: "Projects", tabBarIcon: ({ color, focused }) => <TabIcon label="📁" color={color} focused={focused} /> }}
       />
       <Tabs.Screen
-        name="invoices/index"
+        name="invoices"
         options={{ title: "Payments", tabBarIcon: ({ color, focused }) => <TabIcon label="💳" color={color} focused={focused} /> }}
       />
       <Tabs.Screen
         name="profile"
         options={{ title: "Profile", tabBarIcon: ({ color, focused }) => <TabIcon label="👤" color={color} focused={focused} /> }}
       />
-      {/* Detail routes render outside the tab bar but still live under
-          (app) so they share auth guarding + the root QueryClient. */}
-      <Tabs.Screen name="services/[slug]" options={{ href: null }} />
-      <Tabs.Screen name="projects/[id]" options={{ href: null }} />
-      <Tabs.Screen name="projects/[id]/messages" options={{ href: null }} />
-      <Tabs.Screen name="invoices/[id]" options={{ href: null }} />
-      <Tabs.Screen name="tickets/index" options={{ href: null }} />
-      <Tabs.Screen name="tickets/[id]" options={{ href: null }} />
-      <Tabs.Screen name="tickets/new" options={{ href: null }} />
+      {/* Each of services/projects/invoices/tickets above is now its own
+          folder with a _layout.tsx Stack, so its detail screens ([slug],
+          [id], etc.) push/pop properly inside that tab instead of being
+          registered as separate hidden tabs. tickets has no tab bar button
+          of its own (opened via a link from elsewhere), same for
+          notifications. */}
+      <Tabs.Screen name="tickets" options={{ href: null }} />
       <Tabs.Screen name="notifications/index" options={{ href: null }} />
     </Tabs>
   );
