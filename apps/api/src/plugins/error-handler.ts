@@ -64,8 +64,9 @@ export function registerErrorHandler(app: FastifyInstance) {
     // (likely 5xx) errors should be flattened to a generic message.
     const fastifyStatus = (error as { statusCode?: number }).statusCode;
     if (typeof fastifyStatus === "number" && fastifyStatus >= 400 && fastifyStatus < 500) {
+      const errObj = error as { code?: string; message?: string };
       return reply.status(fastifyStatus).send({
-        error: { code: (error as { code?: string }).code ?? "BAD_REQUEST", message: error.message },
+        error: { code: errObj.code ?? "BAD_REQUEST", message: errObj.message ?? "Bad request" },
       });
     }
 

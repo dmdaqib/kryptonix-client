@@ -1,26 +1,39 @@
-import { Pressable, Text, ActivityIndicator, StyleSheet, type GestureResponderEvent } from "react-native";
+import {
+  Pressable,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing, typography } from "../theme/tokens";
 
 interface ButtonProps {
   label: string;
   onPress?: (e: GestureResponderEvent) => void;
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "outline";
+  size?: "sm" | "md" | "lg";
   loading?: boolean;
   disabled?: boolean;
   fullWidth?: boolean;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Button({
   label,
   onPress,
   variant = "primary",
+  size = "md",
   loading,
   disabled,
   fullWidth = true,
+  style,
 }: ButtonProps) {
   const theme = useTheme();
 
+  const isOutline = variant === "outline";
   const backgroundColor =
     variant === "primary"
       ? theme.primary
@@ -31,7 +44,15 @@ export function Button({
           : "transparent";
 
   const textColor =
-    variant === "primary" || variant === "danger" ? theme.primaryText : theme.textPrimary;
+    variant === "primary" || variant === "danger"
+      ? theme.primaryText
+      : isOutline
+        ? theme.primary
+        : theme.textPrimary;
+
+  const paddingVertical = size === "sm" ? 8 : size === "lg" ? spacing.lg : spacing.md;
+  const paddingHorizontal = size === "sm" ? 12 : size === "lg" ? spacing.xl : spacing.lg;
+  const minHeight = size === "sm" ? 36 : size === "lg" ? 54 : 48;
 
   return (
     <Pressable
@@ -42,17 +63,23 @@ export function Button({
         styles.base,
         {
           backgroundColor,
+          paddingVertical,
+          paddingHorizontal,
+          minHeight,
           opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-          borderWidth: variant === "secondary" || variant === "ghost" ? 1 : 0,
-          borderColor: theme.border,
-          width: fullWidth ? "100%" : undefined,
+          borderWidth: variant === "secondary" || variant === "ghost" || isOutline ? 1 : 0,
+          borderColor: isOutline ? theme.primary : theme.border,
+          width: fullWidth && !style ? "100%" : undefined,
         },
+        style,
       ]}
     >
       {loading ? (
         <ActivityIndicator color={textColor} />
       ) : (
-        <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+        <Text style={[styles.label, { color: textColor, fontSize: size === "sm" ? 13 : 15 }]}>
+          {label}
+        </Text>
       )}
     </Pressable>
   );

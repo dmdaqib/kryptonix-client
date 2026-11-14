@@ -3,7 +3,7 @@ import { useTheme } from "../theme/ThemeProvider";
 import { radii, spacing, typography } from "../theme/tokens";
 
 interface TextFieldProps extends TextInputProps {
-  label: string;
+  label?: string;
   error?: string;
 }
 
@@ -12,7 +12,7 @@ export function TextField({ label, error, style, ...inputProps }: TextFieldProps
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+      {label && <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>}
       <TextInput
         placeholderTextColor={theme.textSecondary}
         style={[

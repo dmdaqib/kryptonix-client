@@ -1,5 +1,6 @@
 import { FlatList, Text, View, Pressable } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
 import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
@@ -43,12 +44,18 @@ export default function NotificationsScreen() {
 
   return (
     <ScreenContainer>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
-        <Text style={[typography.h2, { color: theme.textPrimary }]}>Notifications</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Text style={{ fontSize: 20, color: theme.textPrimary }}>←</Text>
+          </Pressable>
+          <Text style={[typography.h2, { color: theme.textPrimary }]}>Notifications</Text>
+        </View>
         {hasUnread ? (
           <Button
             label="Mark all read"
             variant="ghost"
+            size="sm"
             fullWidth={false}
             loading={markAllReadMutation.isPending}
             onPress={() => markAllReadMutation.mutate()}

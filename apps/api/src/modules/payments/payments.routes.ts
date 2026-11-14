@@ -111,6 +111,45 @@ export async function paymentRoutes(app: FastifyInstance) {
       throw new UnauthorizedError("Payment signature verification failed");
     }
 
+    const isSandbox = payment.providerOrderId.startsWith("order_sbx_");
+
+    if (isSandbox) {
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id },
+          data: { providerPaymentId: input.providerPaymentId, method: input.method ?? "upi", status: "SUCCEEDED" },
+        });
+
+        await tx.paymentAttempt.create({
+          data: { paymentId: payment.id, status: "SUCCEEDED", rawPayload: input },
+        });
+
+        const amountPaid = Number(payment.amount);
+        const invoice = await tx.invoice.update({
+          where: { id: payment.invoiceId },
+          data: { amountPaid: { increment: amountPaid } },
+        });
+
+        if (Number(invoice.amountPaid) >= Number(invoice.totalAmount)) {
+          await tx.invoice.update({ where: { id: invoice.id }, data: { status: "PAID" } });
+        } else {
+          await tx.invoice.update({ where: { id: invoice.id }, data: { status: "PARTIALLY_PAID" } });
+        }
+
+        if (payment.scheduleId) {
+          await tx.paymentSchedule.update({ where: { id: payment.scheduleId }, data: { status: "PAID" } });
+        }
+
+        const receiptNumber = `KX-RCPT-${Date.now()}-${payment.id.slice(-6)}`;
+        await tx.receipt.create({ data: { paymentId: payment.id, receiptNumber } });
+      });
+
+      return reply.send({
+        message: "Sandbox payment verified and recorded successfully.",
+        data: { status: "SUCCEEDED" },
+      });
+    }
+
     await prisma.payment.update({
       where: { id },
       data: { providerPaymentId: input.providerPaymentId, method: input.method, status: "PENDING" },

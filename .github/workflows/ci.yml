@@ -40,14 +40,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          # No `cache: pnpm` here on purpose — that requires a committed
-          # pnpm-lock.yaml to key the cache on, and this repo doesn't have
-          # one yet (it was built in a sandbox with no registry access to
-          # generate it — see PROGRESS.md). Once a lockfile exists from a
-          # real `pnpm install`, add `cache: pnpm` back for faster runs.
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
         run: pnpm db:generate
