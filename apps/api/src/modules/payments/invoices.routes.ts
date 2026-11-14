@@ -123,11 +123,28 @@ export async function invoiceRoutes(app: FastifyInstance) {
       .object({ organizationId: z.string().cuid(), packageId: z.string().cuid() })
       .parse(request.params);
 
+    const bodySchema = z
+      .object({
+        paymentSchedule: z.enum(["FULL", "ADVANCE_50"]).default("FULL"),
+        discountCode: z.string().optional(),
+        customerDetails: z
+          .object({
+            businessName: z.string().optional(),
+            gstin: z.string().optional(),
+            phone: z.string().optional(),
+            address: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional();
+
+    const body = bodySchema.parse(request.body ?? {}) ?? { paymentSchedule: "FULL" };
+
     const actor = await requireOrgPermission(request, organizationId, "quotes.accept");
 
     const pkg = await prisma.servicePackage.findUnique({
       where: { id: packageId },
-      include: { service: true },
+      include: { service: true, features: true },
     });
     if (!pkg || !pkg.isAvailable) {
       throw new NotFoundError("This package is not available for purchase");
@@ -136,13 +153,26 @@ export async function invoiceRoutes(app: FastifyInstance) {
     // Prices and tax always come from the backend record, never from the
     // client request — the mobile app only ever sends a packageId.
     const unitPrice = Number(pkg.priceAmount);
-    const taxPercent = Number(pkg.taxPercent);
+    const taxPercent = Number(pkg.taxPercent) || 18; // standard 18% GST for digital services
+
+    // Validated discount codes
+    let discountAmount = 0;
+    if (body.discountCode) {
+      const code = body.discountCode.trim().toUpperCase();
+      if (code === "KRYPTON10") {
+        discountAmount = Math.round(unitPrice * 0.1);
+      } else if (code === "LAUNCH20") {
+        discountAmount = Math.round(unitPrice * 0.2);
+      }
+    }
+
     const description = `${pkg.service.name} — ${pkg.name}`;
-    const totals = computeInvoiceTotals([{ quantity: 1, unitPrice, taxPercent }], 0);
+    const totals = computeInvoiceTotals([{ quantity: 1, unitPrice, taxPercent }], discountAmount);
 
     const [quoteNumber, invoiceNumber] = await Promise.all([nextQuoteNumber(), nextInvoiceNumber()]);
 
-    const { quote, invoice } = await prisma.$transaction(async (tx) => {
+    const { quote, invoice, project } = await prisma.$transaction(async (tx) => {
+      // 1. Create Accepted Quote
       const quote = await tx.quote.create({
         data: {
           organizationId,
@@ -155,7 +185,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
           taxAmount: totals.taxAmount,
           totalAmount: totals.total,
           currency: pkg.currency,
-          paymentTerms: pkg.paymentTerms,
+          paymentTerms: body.paymentSchedule === "ADVANCE_50" ? "50% Advance, 50% on Final Handover" : pkg.paymentTerms,
           items: {
             create: [
               {
@@ -180,17 +210,87 @@ export async function invoiceRoutes(app: FastifyInstance) {
         },
       });
 
+      // 2. Create Active Project for the Client Workspace
+      const durationDays = pkg.expectedDurationDays ?? 30;
+      const startDate = new Date();
+      const targetDeliveryDate = new Date();
+      targetDeliveryDate.setDate(targetDeliveryDate.getDate() + durationDays);
+
+      const project = await tx.project.create({
+        data: {
+          organizationId,
+          name: `${pkg.service.name} (${pkg.name})`,
+          description: pkg.description,
+          status: "IN_PROGRESS",
+          startDate,
+          expectedDeliveryDate: targetDeliveryDate,
+        },
+      });
+
+      // 3. Create Project Milestones based on package deliverables
+      const m1Due = new Date();
+      m1Due.setDate(m1Due.getDate() + Math.max(3, Math.floor(durationDays * 0.2)));
+      const m2Due = new Date();
+      m2Due.setDate(m2Due.getDate() + Math.max(10, Math.floor(durationDays * 0.65)));
+      const m3Due = targetDeliveryDate;
+
+      await tx.milestone.createMany({
+        data: [
+          {
+            projectId: project.id,
+            name: "Discovery, Wireframes & Architecture",
+            description: "Requirements finalization, design system tokens and project setup.",
+            status: "IN_PROGRESS",
+            requiresClientApproval: true,
+            dueDate: m1Due,
+          },
+          {
+            projectId: project.id,
+            name: "Core System Implementation & Integration",
+            description: "Implementation of primary modules, backend services and client flows.",
+            status: "NOT_STARTED",
+            requiresClientApproval: true,
+            dueDate: m2Due,
+          },
+          {
+            projectId: project.id,
+            name: "Testing, Deliverables Review & Production Handover",
+            description: "End-to-end quality assurance, client acceptance review, deployment and documentation.",
+            status: "NOT_STARTED",
+            requiresClientApproval: true,
+            dueDate: m3Due,
+          },
+        ],
+      });
+
+      // 4. Create Project Conversation for client-team messaging
+      await tx.conversation.create({
+        data: {
+          projectId: project.id,
+          title: `Project Chat — ${project.name}`,
+          members: {
+            create: [{ userId: actor.userId }],
+          },
+        },
+      });
+
+      // 5. Create Invoice
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 3);
+
+      const isAdvance50 = body.paymentSchedule === "ADVANCE_50";
+      const advanceAmount = Math.round((totals.total / 2) * 100) / 100;
+      const finalAmount = Math.round((totals.total - advanceAmount) * 100) / 100;
 
       const invoice = await tx.invoice.create({
         data: {
           organizationId,
+          projectId: project.id,
           quoteId: quote.id,
           invoiceNumber,
           status: "SENT",
           dueDate,
-          paymentTerms: pkg.paymentTerms,
+          paymentTerms: isAdvance50 ? "50% Advance, 50% on Handover" : pkg.paymentTerms,
           currency: pkg.currency,
           subtotalAmount: totals.subtotal,
           discountAmount: totals.discountAmount,
@@ -207,11 +307,31 @@ export async function invoiceRoutes(app: FastifyInstance) {
               },
             ],
           },
+          schedules: isAdvance50
+            ? {
+                create: [
+                  {
+                    label: "50% Advance Kickoff Payment",
+                    amount: advanceAmount,
+                    dueDate,
+                    projectId: project.id,
+                    sortOrder: 0,
+                  },
+                  {
+                    label: "50% Milestone & Delivery Handover",
+                    amount: finalAmount,
+                    dueDate: targetDeliveryDate,
+                    projectId: project.id,
+                    sortOrder: 1,
+                  },
+                ],
+              }
+            : undefined,
         },
         include: { items: true, schedules: true },
       });
 
-      return { quote, invoice };
+      return { quote, invoice, project };
     });
 
     await recordAudit({
@@ -220,10 +340,15 @@ export async function invoiceRoutes(app: FastifyInstance) {
       action: "package.purchased",
       entityType: "Invoice",
       entityId: invoice.id,
-      metaJson: { packageId, quoteId: quote.id, total: totals.total },
+      metaJson: { packageId, quoteId: quote.id, projectId: project.id, total: totals.total },
     });
 
-    return reply.status(201).send({ data: invoice });
+    return reply.status(201).send({
+      data: {
+        ...invoice,
+        projectId: project.id,
+      },
+    });
   });
 
   // Client: list invoices for their organization.

@@ -1,6 +1,9 @@
 // Seed data for LOCAL/DEV environments only (rule: never seed demo data in
 // production). Run with `pnpm db:seed` after `pnpm db:migrate`.
 
+import dotenv from "dotenv";
+dotenv.config();
+dotenv.config({ path: "apps/api/.env" });
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../packages/shared/src/security/password.ts";
 
@@ -18,6 +21,64 @@ async function main() {
 
   const categories = [
     {
+      name: "Website Development",
+      slug: "website-development",
+      services: [
+        {
+          name: "High-Performance Business Website",
+          slug: "high-performance-business-website",
+          summary: "Ultra-fast, mobile-first responsive corporate website built for high conversion.",
+          description:
+            "Modern, SEO-optimized business website designed to establish brand credibility and turn visitors into qualified leads with interactive enquiry forms.",
+          packages: [
+            {
+              name: "Professional Landing Page",
+              description: "A conversion-focused single-page experience for product or service campaigns.",
+              priceAmount: 18000,
+              expectedDurationDays: 7,
+              features: ["Mobile-first responsive design", "Lead capture forms with email alerts", "Speed optimized (< 1s load)", "Analytics & Meta Pixel setup", "14 days post-launch support"],
+            },
+            {
+              name: "Corporate Multi-Page Site",
+              description: "Complete corporate website with up to 8 pages, CMS integration and full SEO.",
+              priceAmount: 38000,
+              expectedDurationDays: 20,
+              features: ["Up to 8 custom designed pages", "Content Management System (CMS)", "On-page SEO optimization", "Interactive contact & quotation forms", "30 days post-launch support"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Mobile App Development",
+      slug: "mobile-app-development",
+      services: [
+        {
+          name: "Cross-Platform iOS & Android Mobile App",
+          slug: "cross-platform-mobile-app",
+          summary: "Native-quality React Native & Expo mobile app for iOS and Android.",
+          description:
+            "Production-ready mobile applications with modern UX, offline support, push notifications, secure authentication, and app store publishing support.",
+          packages: [
+            {
+              name: "MVP Mobile App",
+              description: "Core mobile experience published to internal test tracks for quick launch.",
+              priceAmount: 85000,
+              expectedDurationDays: 35,
+              features: ["iOS & Android support via React Native", "Up to 8 interactive screens", "Push notifications setup", "Secure user auth & profiles", "Google Play & App Store build files"],
+            },
+            {
+              name: "Scale Mobile Platform",
+              description: "Complete client-facing mobile app with payment integration and backend sync.",
+              priceAmount: 195000,
+              expectedDurationDays: 60,
+              features: ["iOS & Android release management", "Real-time chat & notifications", "Razorpay / Stripe in-app payments", "Admin control panel integration", "60 days post-launch warranty"],
+            },
+          ],
+        },
+      ],
+    },
+    {
       name: "Custom Software Development",
       slug: "custom-software",
       services: [
@@ -26,8 +87,7 @@ async function main() {
           slug: "custom-web-mobile-apps",
           summary: "A bespoke web or mobile application built around your workflow, not a template.",
           description:
-            "End-to-end design and development of a custom web and/or mobile application — from " +
-            "requirements and UX through to a production-ready build, QA and launch support.",
+            "End-to-end design and development of a custom web and/or mobile application — from requirements and UX through to a production-ready build, QA and launch support.",
           packages: [
             {
               name: "Starter Build",
@@ -48,6 +108,28 @@ async function main() {
       ],
     },
     {
+      name: "E-commerce Solutions",
+      slug: "ecommerce-solutions",
+      services: [
+        {
+          name: "Full-Stack Custom E-Commerce Store",
+          slug: "custom-ecommerce-store",
+          summary: "Modern commerce experience with fast checkout, cart management and inventory tracking.",
+          description:
+            "Custom-built e-commerce storefront with product catalog, cart, discount coupons, Razorpay/UPI checkout, order tracking, and inventory management.",
+          packages: [
+            {
+              name: "E-Commerce Launchpad",
+              description: "Complete online store for growing digital and retail brands.",
+              priceAmount: 48000,
+              expectedDurationDays: 21,
+              features: ["Product catalog & categories", "Shopping cart & instant checkout", "Razorpay UPI/Cards integration", "Order management dashboard", "Automated email & SMS invoices"],
+            },
+          ],
+        },
+      ],
+    },
+    {
       name: "Salon & Gym Management Software",
       slug: "salon-gym-software",
       services: [
@@ -56,38 +138,43 @@ async function main() {
           slug: "salon-gym-platform",
           summary: "Bookings, staff rosters, memberships and billing in one dashboard.",
           description:
-            "A management platform tailored to salons and gyms: appointment/class booking, staff " +
-            "scheduling, membership and package tracking, and billing — with a client-facing booking app.",
+            "A management platform tailored to salons and gyms: appointment/class booking, staff scheduling, membership and package tracking, and billing — with a client-facing booking app.",
           packages: [
             {
               name: "Single Location",
               description: "Everything one salon or gym needs to run bookings and memberships online.",
               priceAmount: 45000,
               expectedDurationDays: 21,
-              features: ["Online booking page", "Staff & class scheduling", "Membership/package tracking", "Client booking app"],
+              features: ["Online booking page", "Staff & class scheduling", "Membership/package tracking", "Client booking app", "Automated WhatsApp appointment reminders"],
+            },
+            {
+              name: "Multi-Branch Enterprise",
+              description: "Centralized management for multiple fitness centers or salon chains.",
+              priceAmount: 95000,
+              expectedDurationDays: 45,
+              features: ["Multi-branch management", "Central inventory & POS billing", "Staff performance & payroll metrics", "White-labeled customer mobile app", "Dedicated account support"],
             },
           ],
         },
       ],
     },
     {
-      name: "Website & Booking Development",
-      slug: "websites-booking",
+      name: "Booking and Appointment Systems",
+      slug: "booking-appointment-systems",
       services: [
         {
-          name: "Business Website with Online Booking",
-          slug: "business-website-booking",
-          summary: "A fast, modern website with built-in online booking or lead capture.",
+          name: "Smart Online Appointment Booking System",
+          slug: "smart-appointment-booking",
+          summary: "Real-time calendar scheduling, staff allocation and payment integration.",
           description:
-            "A professionally designed business website — built for speed and conversions — with an " +
-            "integrated booking or enquiry flow so visitors can act immediately, not just browse.",
+            "Seamless booking portal for consultants, clinics, spas, and service businesses with automated Google Calendar sync and payment collection.",
           packages: [
             {
-              name: "Essentials",
-              description: "A clean multi-page site with a booking or enquiry form built in.",
-              priceAmount: 25000,
+              name: "Standard Booking Suite",
+              description: "Turnkey appointment engine embedded into your website or as a standalone app.",
+              priceAmount: 28000,
               expectedDurationDays: 14,
-              features: ["Up to 6 pages", "Mobile-first responsive design", "Booking/enquiry form", "Basic on-page SEO setup"],
+              features: ["Real-time slot availability", "Google/Outlook calendar sync", "Upfront deposit or full payment collection", "Automated SMS/Email confirmation", "Custom booking questions"],
             },
           ],
         },
@@ -102,8 +189,7 @@ async function main() {
           slug: "seo-growth",
           summary: "Ongoing technical, on-page and content SEO to grow organic search traffic.",
           description:
-            "A monthly SEO engagement covering technical audits, on-page optimization, content " +
-            "strategy and reporting, focused on measurable ranking and traffic growth.",
+            "A monthly SEO engagement covering technical audits, on-page optimization, content strategy and reporting, focused on measurable ranking and traffic growth.",
           packages: [
             {
               name: "Monthly Growth",
@@ -112,55 +198,145 @@ async function main() {
               taxPercent: 18,
               paymentTerms: "Billed monthly",
               expectedDurationDays: 30,
-              features: ["Technical SEO audit", "On-page optimization", "Monthly content plan", "Monthly ranking report"],
+              features: ["Technical SEO audit", "On-page optimization", "Google Business Profile boost", "Monthly content plan", "Monthly ranking report"],
             },
           ],
         },
       ],
     },
     {
-      name: "Google & Meta Ads",
-      slug: "paid-ads",
+      name: "Digital Marketing",
+      slug: "digital-marketing",
       services: [
         {
-          name: "Google & Meta Ads Management",
-          slug: "google-meta-ads",
-          summary: "Campaign setup and ongoing management across Google and Meta.",
+          name: "Full-Funnel Digital Marketing",
+          slug: "full-funnel-digital-marketing",
+          summary: "Multi-channel customer acquisition strategy driving qualified leads and revenue.",
           description:
-            "End-to-end paid campaign management across Google Search/Display and Meta (Facebook/" +
-            "Instagram) — audience research, creative guidance, campaign setup and ongoing optimization.",
+            "Comprehensive digital marketing management covering social media strategy, email marketing, landing page conversion rate optimization, and brand positioning.",
           packages: [
             {
-              name: "Monthly Management",
-              description: "Campaign management fee — ad spend is billed separately to your own ad accounts.",
-              priceAmount: 15000,
+              name: "Growth Retainer",
+              description: "Full-spectrum digital marketing team driving weekly growth.",
+              priceAmount: 32000,
               taxPercent: 18,
-              paymentTerms: "Billed monthly, ad spend separate",
+              paymentTerms: "Billed monthly",
               expectedDurationDays: 30,
-              features: ["Campaign setup across Google & Meta", "Audience & keyword research", "Weekly optimization", "Monthly performance report"],
+              features: ["Content marketing strategy", "Social media creatives & copywriting", "Email automation sequences", "Bi-weekly growth review calls", "Lead tracking analytics"],
             },
           ],
         },
       ],
     },
     {
-      name: "Business Automation & AI Solutions",
-      slug: "automation-ai",
+      name: "Google Ads",
+      slug: "google-ads",
       services: [
         {
-          name: "AI Workflow Automation",
-          slug: "ai-workflow-automation",
-          summary: "Automate repetitive business workflows with custom scripts, bots and AI tools.",
+          name: "Google Ads Lead Generation Engine",
+          slug: "google-ads-lead-generation",
+          summary: "Targeted Search & Performance Max campaigns converting high-intent searches.",
           description:
-            "We map your repetitive manual workflows (lead handling, reporting, support replies, " +
-            "data entry) and automate them with custom scripts, integrations and AI-assisted tools.",
+            "Strategic Google Ads setup, negative keyword filtering, conversion tracking, and bidding optimization to maximize ROI and lower cost-per-lead.",
           packages: [
             {
-              name: "Process Audit & Automation",
-              description: "We audit up to 3 workflows and automate the highest-impact ones.",
-              priceAmount: 35000,
+              name: "Search & Conversion Setup",
+              description: "Complete account structuring, campaign launch, and 30 days active optimization.",
+              priceAmount: 22000,
+              taxPercent: 18,
+              paymentTerms: "Billed monthly, ad budget separate",
+              expectedDurationDays: 30,
+              features: ["Competitor & keyword research", "High-converting ad copies", "Google Tag Manager conversion tracking", "A/B testing of ad variations", "Transparent weekly performance reporting"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Meta Ads",
+      slug: "meta-ads",
+      services: [
+        {
+          name: "Meta Ads (Facebook & Instagram) Funnel",
+          slug: "meta-ads-funnel",
+          summary: "High-impact visual creative testing and retargeting funnels for scale.",
+          description:
+            "Creative direction, audience testing, Conversions API setup, and retargeting campaigns tailored to Instagram and Facebook feeds, stories, and reels.",
+          packages: [
+            {
+              name: "Campaign Scaling Sprint",
+              description: "End-to-end Meta ad management focused on profitable customer acquisition.",
+              priceAmount: 20000,
+              taxPercent: 18,
+              paymentTerms: "Billed monthly, ad budget separate",
+              expectedDurationDays: 30,
+              features: ["Custom audience & lookalike segmentation", "High-converting ad creative design", "Meta CAPI (Conversions API) integration", "Retargeting campaigns", "Weekly budget rebalancing"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Business Automation",
+      slug: "business-automation",
+      services: [
+        {
+          name: "End-to-End Business Automation",
+          slug: "business-process-automation",
+          summary: "Connect your CRM, billing, WhatsApp and team tools to run on autopilot.",
+          description:
+            "Eliminate manual data entry and delays. We interconnect your lead forms, WhatsApp Business API, CRM, payment alerts, and internal spreadsheets into seamless workflows.",
+          packages: [
+            {
+              name: "Operations Autopilot",
+              description: "Automate lead routing, payment alerts, and customer notifications.",
+              priceAmount: 32000,
+              expectedDurationDays: 14,
+              features: ["WhatsApp Business API lead alerts", "CRM & Google Sheets synchronization", "Payment confirmation webhook workflows", "Team notification routing (Slack/Email)", "30 days monitoring & tweaks"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "AI Solutions",
+      slug: "ai-solutions",
+      services: [
+        {
+          name: "Custom AI Assistant & Knowledge Agent",
+          slug: "custom-ai-assistant",
+          summary: "24/7 AI-driven support and lead qualification trained on your business data.",
+          description:
+            "Intelligent conversational AI trained specifically on your company's documents, products, pricing, and FAQs to answer customer inquiries and book discovery calls automatically.",
+          packages: [
+            {
+              name: "AI Knowledge Agent",
+              description: "Custom AI agent trained on your company knowledge base.",
+              priceAmount: 45000,
               expectedDurationDays: 21,
-              features: ["Workflow audit (up to 3 processes)", "Custom automation build", "Team handover & training", "30 days support"],
+              features: ["Trained on proprietary company knowledge", "Embeddable on website & WhatsApp", "Lead qualification & contact capture", "Human escalation failover", "Monthly performance analytics"],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: "Custom Business Applications",
+      slug: "custom-business-apps",
+      services: [
+        {
+          name: "Enterprise Internal Tool & Portal",
+          slug: "enterprise-internal-portal",
+          summary: "Secure operational dashboards, staff portals and ERP tools.",
+          description:
+            "Bespoke internal management systems: role-based access control, approval hierarchies, automated document generation, and database reporting.",
+          packages: [
+            {
+              name: "Operations Dashboard",
+              description: "Custom internal portal replacing messy spreadsheets.",
+              priceAmount: 90000,
+              expectedDurationDays: 35,
+              features: ["Role-based access control (RBAC)", "Custom data tables & CSV export", "Automated PDF report generation", "Audit logging for all actions", "Dedicated cloud deployment"],
             },
           ],
         },

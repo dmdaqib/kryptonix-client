@@ -1,15 +1,25 @@
 import { useState } from "react";
-import { ScrollView, Text, View, Alert } from "react-native";
+import {
+  ScrollView,
+  Text,
+  View,
+  Alert,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
 import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
 import { TextField } from "../../../src/components/TextField";
+import { StatusPill } from "../../../src/components/StatusPill";
 import { useAuthStore } from "../../../src/stores/auth-store";
 import { apiRequest, ApiError } from "../../../src/lib/api-client";
 import { useTheme } from "../../../src/theme/ThemeProvider";
-import { spacing, radii, typography } from "../../../src/theme/tokens";
+import { colors, spacing, radii, typography } from "../../../src/theme/tokens";
 
 interface Approval {
   id: string;
@@ -31,6 +41,7 @@ interface Milestone {
   name: string;
   description: string | null;
   status: string;
+  dueDate?: string | null;
   requiresClientApproval: boolean;
   deliverables: Deliverable[];
 }
@@ -46,34 +57,10 @@ interface ProjectDetail {
   name: string;
   description: string | null;
   status: string;
+  startDate?: string | null;
+  expectedDeliveryDate?: string | null;
   milestones: Milestone[];
   updates: ProjectUpdate[];
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  NOT_STARTED: "Not started",
-  PLANNING: "Planning",
-  IN_PROGRESS: "In progress",
-  UNDER_CLIENT_REVIEW: "Under your review",
-  REVISION_REQUIRED: "Revision required",
-  ON_HOLD: "On hold",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  SUBMITTED_FOR_REVIEW: "Awaiting your review",
-  APPROVED: "Approved",
-  REVISION_REQUESTED: "Changes requested",
-};
-
-function StatusPill({ status }: { status: string }) {
-  const theme = useTheme();
-  const positive = status === "COMPLETED" || status === "APPROVED";
-  const attention = status === "SUBMITTED_FOR_REVIEW" || status === "UNDER_CLIENT_REVIEW";
-  const color = positive ? theme.success : attention ? theme.warning : theme.textSecondary;
-  return (
-    <View style={{ backgroundColor: `${color}22`, borderRadius: radii.full, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
-      <Text style={[typography.small, { color, fontWeight: "700" }]}>{STATUS_LABELS[status] ?? status}</Text>
-    </View>
-  );
 }
 
 export default function ProjectDetailScreen() {
@@ -90,7 +77,7 @@ export default function ProjectDetailScreen() {
   const [submittingToMilestoneId, setSubmittingToMilestoneId] = useState<string | null>(null);
   const [deliverableFileName, setDeliverableFileName] = useState("");
 
-  const { data: project, isLoading } = useQuery({
+  const { data: project, isLoading, refetch } = useQuery({
     queryKey: ["project", id],
     queryFn: () => apiRequest<ProjectDetail>(`/api/v1/projects/${id}`),
     enabled: Boolean(id),
@@ -101,7 +88,10 @@ export default function ProjectDetailScreen() {
   const approveMutation = useMutation({
     mutationFn: (deliverableId: string) =>
       apiRequest(`/api/v1/deliverables/${deliverableId}/approve`, { method: "POST" }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      Alert.alert("Deliverable Approved", "Milestone completed! KryptonIX staff have been notified.");
+      invalidate();
+    },
     onError: (err) => Alert.alert("Couldn't approve", err instanceof ApiError ? err.message : "Try again."),
   });
 
@@ -111,6 +101,7 @@ export default function ProjectDetailScreen() {
     onSuccess: () => {
       setRevisingDeliverableId(null);
       setRevisionNotes("");
+      Alert.alert("Changes Requested", "Feedback submitted to the development team.");
       invalidate();
     },
     onError: (err) => Alert.alert("Couldn't send", err instanceof ApiError ? err.message : "Try again."),
@@ -132,10 +123,6 @@ export default function ProjectDetailScreen() {
 
   const submitDeliverableMutation = useMutation({
     mutationFn: async ({ milestoneId, fileName }: { milestoneId: string; fileName: string }) => {
-      // No real object-storage provider is wired up in this build (see
-      // PROGRESS.md) — this registers file metadata directly rather than
-      // going through a presigned upload, which is the one piece a real
-      // deployment adds before this screen touches real files.
       const file = await apiRequest<{ id: string }>(`/api/v1/projects/${id}/files`, {
         method: "POST",
         body: {
@@ -154,6 +141,7 @@ export default function ProjectDetailScreen() {
     onSuccess: () => {
       setSubmittingToMilestoneId(null);
       setDeliverableFileName("");
+      Alert.alert("Deliverable Submitted", "Submitted for client review.");
       invalidate();
     },
     onError: (err) => Alert.alert("Couldn't submit", err instanceof ApiError ? err.message : "Try again."),
@@ -162,101 +150,188 @@ export default function ProjectDetailScreen() {
   if (isLoading || !project) {
     return (
       <ScreenContainer>
-        <Text style={[typography.body, { color: theme.textSecondary }]}>Loading project…</Text>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
       </ScreenContainer>
     );
   }
 
+  const milestones = project.milestones ?? [];
+  const completedCount = milestones.filter((m) => m.status === "APPROVED").length;
+  const progressPercent = Math.round((completedCount / Math.max(1, milestones.length)) * 100);
+
   return (
     <ScreenContainer>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Text style={[typography.h2, { color: theme.textPrimary, flex: 1 }]}>{project.name}</Text>
-          <StatusPill status={project.status} />
-        </View>
-        {project.description ? (
-          <Text style={[typography.body, { color: theme.textSecondary, marginTop: spacing.xs }]}>
-            {project.description}
-          </Text>
-        ) : null}
+      {/* Top Header */}
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
+          <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
+        </Pressable>
+        <Text style={[typography.h3, { color: theme.textPrimary, flex: 1, marginLeft: 8 }]} numberOfLines={1}>
+          {project.name}
+        </Text>
+        <Pressable
+          style={styles.chatIconBtn}
+          onPress={() => router.push(`/(app)/projects/${id}/messages` as Parameters<typeof router.push>[0])}
+          hitSlop={8}
+        >
+          <Ionicons name="chatbubbles" size={22} color={colors.violet700} />
+        </Pressable>
+      </View>
 
-        <View style={{ marginTop: spacing.md, marginBottom: spacing.lg }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        {/* Project Overview Card */}
+        <Card style={styles.overviewCard}>
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={[typography.caption, { color: colors.violet700, fontWeight: "700" }]}>
+                PROJECT WORKSPACE
+              </Text>
+              <Text style={[typography.h2, { color: theme.textPrimary, marginTop: 2 }]}>
+                {project.name}
+              </Text>
+            </View>
+            <StatusPill status={project.status} />
+          </View>
+
+          {project.description && (
+            <Text style={[typography.caption, { color: theme.textSecondary, marginTop: spacing.xs, lineHeight: 18 }]}>
+              {project.description}
+            </Text>
+          )}
+
+          {/* Progress Bar */}
+          <View style={styles.progressSection}>
+            <View style={styles.progressLabelRow}>
+              <Text style={[typography.caption, { color: theme.textPrimary, fontWeight: "600" }]}>
+                Overall Progress ({progressPercent}%)
+              </Text>
+              <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                {completedCount} of {milestones.length} Milestones
+              </Text>
+            </View>
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.max(6, progressPercent)}%`, backgroundColor: colors.success },
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* Quick Chat CTA */}
           <Button
-            label="Open project chat"
-            variant="secondary"
-            onPress={() => router.push(`/(app)/projects/${id}/messages`)}
+            label="Open Team Workspace Chat"
+            variant="outline"
+            onPress={() => router.push(`/(app)/projects/${id}/messages` as Parameters<typeof router.push>[0])}
+            style={{ marginTop: spacing.sm }}
           />
-        </View>
+        </Card>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm }}>
-          <Text style={[typography.h3, { color: theme.textPrimary }]}>Milestones</Text>
+        {/* Milestones Header */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={[typography.h3, { color: theme.textPrimary }]}>Milestones & Deliverables</Text>
           {isStaff ? (
-            <Button
-              label={addingMilestone ? "Cancel" : "+ Add"}
-              variant="ghost"
-              fullWidth={false}
-              onPress={() => setAddingMilestone((v) => !v)}
-            />
+            <Pressable onPress={() => setAddingMilestone((v) => !v)} hitSlop={8}>
+              <Text style={[typography.caption, { color: theme.primary, fontWeight: "700" }]}>
+                {addingMilestone ? "Cancel" : "+ Add Milestone"}
+              </Text>
+            </Pressable>
           ) : null}
         </View>
 
-        {addingMilestone ? (
-          <Card style={{ marginBottom: spacing.md }}>
+        {addingMilestone && (
+          <Card style={{ marginBottom: spacing.md, padding: spacing.md }}>
             <TextField
               label="Milestone name"
               value={newMilestoneName}
               onChangeText={setNewMilestoneName}
-              placeholder="e.g. Homepage design"
+              placeholder="e.g. Design Wireframes & API Spec"
             />
             <Button
               label="Create milestone"
               loading={createMilestoneMutation.isPending}
               disabled={newMilestoneName.trim().length === 0}
               onPress={() => createMilestoneMutation.mutate(newMilestoneName.trim())}
+              style={{ marginTop: spacing.sm }}
             />
           </Card>
-        ) : null}
+        )}
 
-        {project.milestones.length === 0 ? (
-          <Text style={[typography.caption, { color: theme.textSecondary, marginBottom: spacing.lg }]}>
-            No milestones yet.
-          </Text>
+        {/* Milestones List */}
+        {milestones.length === 0 ? (
+          <Card style={{ padding: spacing.md }}>
+            <Text style={[typography.caption, { color: theme.textSecondary }]}>
+              No milestones created yet. Milestones will appear as the project is scheduled.
+            </Text>
+          </Card>
         ) : (
-          project.milestones.map((milestone) => {
-            const latestDeliverable = milestone.deliverables[0];
-            const pendingApproval =
-              !isStaff &&
-              milestone.requiresClientApproval &&
-              milestone.status === "SUBMITTED_FOR_REVIEW" &&
-              latestDeliverable;
+          <View style={styles.milestonesList}>
+            {milestones.map((milestone, idx) => {
+              const latestDeliverable = milestone.deliverables[0];
+              const pendingApproval =
+                !isStaff &&
+                milestone.requiresClientApproval &&
+                milestone.status === "SUBMITTED_FOR_REVIEW" &&
+                latestDeliverable;
 
-            return (
-              <Card key={milestone.id} style={{ marginBottom: spacing.sm }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={[typography.bodyStrong, { color: theme.textPrimary, flex: 1 }]}>{milestone.name}</Text>
-                  <StatusPill status={milestone.status} />
-                </View>
+              return (
+                <Card key={milestone.id} style={styles.milestoneCard}>
+                  <View style={styles.milestoneHeader}>
+                    <View style={styles.milestoneIndexBadge}>
+                      <Text style={styles.milestoneIndexText}>{idx + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>
+                        {milestone.name}
+                      </Text>
+                      {milestone.dueDate && (
+                        <Text style={[typography.small, { color: theme.textSecondary }]}>
+                          Target Date: {new Date(milestone.dueDate).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </View>
+                    <StatusPill status={milestone.status} />
+                  </View>
 
-                {latestDeliverable ? (
-                  <Text style={[typography.caption, { color: theme.textSecondary, marginTop: spacing.xs }]}>
-                    Latest: {latestDeliverable.file.originalName} (v{latestDeliverable.version})
-                  </Text>
-                ) : null}
+                  {milestone.description && (
+                    <Text style={[typography.caption, { color: theme.textSecondary, marginTop: 4 }]}>
+                      {milestone.description}
+                    </Text>
+                  )}
 
-                {pendingApproval ? (
-                  revisingDeliverableId === latestDeliverable.id ? (
-                    <View style={{ marginTop: spacing.sm }}>
-                      <TextField
-                        label="What needs to change?"
-                        value={revisionNotes}
-                        onChangeText={setRevisionNotes}
-                        multiline
-                        placeholder="Describe the changes you'd like"
-                      />
-                      <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                        <View style={{ flex: 1 }}>
+                  {/* Deliverable info */}
+                  {latestDeliverable && (
+                    <View style={styles.deliverableBox}>
+                      <Ionicons name="document-attach" size={18} color={theme.primary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[typography.caption, { color: theme.textPrimary, fontWeight: "600" }]}>
+                          Deliverable: {latestDeliverable.file.originalName} (v{latestDeliverable.version})
+                        </Text>
+                        <Text style={[typography.small, { color: theme.textSecondary }]}>
+                          Submitted {new Date(latestDeliverable.submittedAt).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Client Approval or Revision UI */}
+                  {pendingApproval ? (
+                    revisingDeliverableId === latestDeliverable.id ? (
+                      <View style={styles.revisionBox}>
+                        <TextField
+                          label="Describe Changes Required"
+                          value={revisionNotes}
+                          onChangeText={setRevisionNotes}
+                          multiline
+                          placeholder="What revisions or updates are needed before sign-off?"
+                        />
+                        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
                           <Button
-                            label="Send"
+                            label="Submit Changes"
+                            size="sm"
                             loading={requestRevisionMutation.isPending}
                             disabled={revisionNotes.trim().length < 3}
                             onPress={() =>
@@ -265,50 +340,51 @@ export default function ProjectDetailScreen() {
                                 notes: revisionNotes.trim(),
                               })
                             }
+                            style={{ flex: 1 }}
                           />
-                        </View>
-                        <View style={{ flex: 1 }}>
                           <Button
                             label="Cancel"
                             variant="secondary"
+                            size="sm"
                             onPress={() => setRevisingDeliverableId(null)}
+                            style={{ flex: 1 }}
                           />
                         </View>
                       </View>
-                    </View>
-                  ) : (
-                    <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
-                      <View style={{ flex: 1 }}>
+                    ) : (
+                      <View style={styles.approvalActionsRow}>
                         <Button
-                          label="Approve"
+                          label="Approve Deliverable"
+                          size="sm"
                           loading={approveMutation.isPending}
                           onPress={() => approveMutation.mutate(latestDeliverable.id)}
+                          style={{ flex: 1 }}
                         />
-                      </View>
-                      <View style={{ flex: 1 }}>
                         <Button
-                          label="Request changes"
-                          variant="secondary"
+                          label="Request Changes"
+                          variant="outline"
+                          size="sm"
                           onPress={() => setRevisingDeliverableId(latestDeliverable.id)}
+                          style={{ flex: 1 }}
                         />
                       </View>
-                    </View>
-                  )
-                ) : null}
+                    )
+                  ) : null}
 
-                {isStaff ? (
-                  submittingToMilestoneId === milestone.id ? (
-                    <View style={{ marginTop: spacing.sm }}>
-                      <TextField
-                        label="Deliverable file name"
-                        value={deliverableFileName}
-                        onChangeText={setDeliverableFileName}
-                        placeholder="e.g. homepage-v1.fig"
-                      />
-                      <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                        <View style={{ flex: 1 }}>
+                  {/* Staff Deliverable Submission UI */}
+                  {isStaff && (
+                    submittingToMilestoneId === milestone.id ? (
+                      <View style={styles.revisionBox}>
+                        <TextField
+                          label="Deliverable file or release name"
+                          value={deliverableFileName}
+                          onChangeText={setDeliverableFileName}
+                          placeholder="e.g. kryptonix-mvp-release-v1.zip"
+                        />
+                        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
                           <Button
-                            label="Submit"
+                            label="Submit to Client"
+                            size="sm"
                             loading={submitDeliverableMutation.isPending}
                             disabled={deliverableFileName.trim().length === 0}
                             onPress={() =>
@@ -317,44 +393,160 @@ export default function ProjectDetailScreen() {
                                 fileName: deliverableFileName.trim(),
                               })
                             }
+                            style={{ flex: 1 }}
+                          />
+                          <Button
+                            label="Cancel"
+                            variant="secondary"
+                            size="sm"
+                            onPress={() => setSubmittingToMilestoneId(null)}
+                            style={{ flex: 1 }}
                           />
                         </View>
-                        <View style={{ flex: 1 }}>
-                          <Button label="Cancel" variant="secondary" onPress={() => setSubmittingToMilestoneId(null)} />
-                        </View>
                       </View>
-                    </View>
-                  ) : (
-                    <View style={{ marginTop: spacing.sm }}>
-                      <Button
-                        label="Submit deliverable"
-                        variant="ghost"
-                        onPress={() => setSubmittingToMilestoneId(milestone.id)}
-                      />
-                    </View>
-                  )
-                ) : null}
-              </Card>
-            );
-          })
+                    ) : (
+                      <View style={{ marginTop: spacing.sm }}>
+                        <Button
+                          label="+ Submit Deliverable"
+                          variant="ghost"
+                          size="sm"
+                          onPress={() => setSubmittingToMilestoneId(milestone.id)}
+                        />
+                      </View>
+                    )
+                  )}
+                </Card>
+              );
+            })}
+          </View>
         )}
 
-        {project.updates.length > 0 ? (
-          <>
-            <Text style={[typography.h3, { color: theme.textPrimary, marginTop: spacing.lg, marginBottom: spacing.sm }]}>
-              Updates
+        {/* Project Updates Timeline */}
+        {project.updates && project.updates.length > 0 && (
+          <View style={{ marginTop: spacing.lg }}>
+            <Text style={[typography.h3, { color: theme.textPrimary, marginBottom: spacing.sm }]}>
+              Recent Activity & Updates
             </Text>
             {project.updates.map((update) => (
-              <Card key={update.id} style={{ marginBottom: spacing.sm }}>
+              <Card key={update.id} style={{ marginBottom: spacing.sm, padding: spacing.md }}>
                 <Text style={[typography.body, { color: theme.textPrimary }]}>{update.body}</Text>
-                <Text style={[typography.small, { color: theme.textSecondary, marginTop: spacing.xs }]}>
+                <Text style={[typography.small, { color: theme.textSecondary, marginTop: 4 }]}>
                   {new Date(update.createdAt).toLocaleString()}
                 </Text>
               </Card>
             ))}
-          </>
-        ) : null}
+          </View>
+        )}
+
+        <View style={{ height: 60 }} />
       </ScrollView>
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  backButton: {
+    padding: 4,
+  },
+  chatIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.violet50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl,
+  },
+  overviewCard: {
+    padding: spacing.md,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  progressSection: {
+    marginTop: spacing.md,
+  },
+  progressLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: colors.neutral200,
+    borderRadius: radii.full,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: 8,
+    borderRadius: radii.full,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  milestonesList: {
+    gap: spacing.sm,
+  },
+  milestoneCard: {
+    padding: spacing.md,
+  },
+  milestoneHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  milestoneIndexBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: radii.full,
+    backgroundColor: colors.violet100,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    marginTop: 2,
+  },
+  milestoneIndexText: {
+    ...typography.small,
+    color: colors.violet700,
+    fontWeight: "700",
+  },
+  deliverableBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.violet50,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  approvalActionsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  revisionBox: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.neutral50,
+    borderRadius: radii.sm,
+  },
+});

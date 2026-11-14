@@ -38,10 +38,15 @@ export default function TicketsScreen() {
 
   return (
     <ScreenContainer>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md }}>
-        <Text style={[typography.h2, { color: theme.textPrimary }]}>Support</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Text style={{ fontSize: 20, color: theme.textPrimary }}>←</Text>
+          </Pressable>
+          <Text style={[typography.h2, { color: theme.textPrimary }]}>Support Tickets</Text>
+        </View>
         {!isStaff ? (
-          <Button label="New ticket" fullWidth={false} onPress={() => router.push("/(app)/tickets/new")} />
+          <Button label="+ New" size="sm" fullWidth={false} onPress={() => router.push("/(app)/tickets/new")} />
         ) : null}
       </View>
 

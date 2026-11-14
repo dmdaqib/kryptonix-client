@@ -1,10 +1,6 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../src/theme/ThemeProvider";
-
-function TabIcon({ label, focused, color }: { label: string; focused: boolean; color: string }) {
-  return <Text style={{ color, fontSize: 20 }}>{label}</Text>;
-}
 
 export default function AppTabsLayout() {
   const theme = useTheme();
@@ -15,32 +11,73 @@ export default function AppTabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.textSecondary,
-        tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
+        tabBarStyle: {
+          backgroundColor: theme.background,
+          borderTopColor: theme.border,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "600",
+        },
       }}
     >
       <Tabs.Screen
         name="dashboard"
-        options={{ title: "Dashboard", tabBarIcon: ({ color, focused }) => <TabIcon label="🏠" color={color} focused={focused} /> }}
+        options={{
+          title: "Home",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
+          ),
+        }}
       />
       <Tabs.Screen
         name="services/index"
-        options={{ title: "Services", tabBarIcon: ({ color, focused }) => <TabIcon label="🧩" color={color} focused={focused} /> }}
+        options={{
+          title: "Services",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "grid" : "grid-outline"} size={22} color={color} />
+          ),
+        }}
       />
       <Tabs.Screen
         name="projects/index"
-        options={{ title: "Projects", tabBarIcon: ({ color, focused }) => <TabIcon label="📁" color={color} focused={focused} /> }}
+        options={{
+          title: "Projects",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "briefcase" : "briefcase-outline"} size={22} color={color} />
+          ),
+        }}
       />
       <Tabs.Screen
         name="invoices/index"
-        options={{ title: "Payments", tabBarIcon: ({ color, focused }) => <TabIcon label="💳" color={color} focused={focused} /> }}
+        options={{
+          title: "Billing",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "receipt" : "receipt-outline"} size={22} color={color} />
+          ),
+        }}
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: "Profile", tabBarIcon: ({ color, focused }) => <TabIcon label="👤" color={color} focused={focused} /> }}
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
+          ),
+        }}
       />
-      {/* Detail routes render outside the tab bar but still live under
-          (app) so they share auth guarding + the root QueryClient. */}
+
+      {/* Detail & modal routes render outside the tab bar */}
       <Tabs.Screen name="services/[slug]" options={{ href: null }} />
+      <Tabs.Screen name="services/search" options={{ href: null }} />
+      <Tabs.Screen name="cart/index" options={{ href: null }} />
+      <Tabs.Screen name="enquiry/new" options={{ href: null }} />
+      <Tabs.Screen name="quotes/index" options={{ href: null }} />
+      <Tabs.Screen name="quotes/[id]" options={{ href: null }} />
+      <Tabs.Screen name="staff/index" options={{ href: null }} />
       <Tabs.Screen name="projects/[id]" options={{ href: null }} />
       <Tabs.Screen name="projects/[id]/messages" options={{ href: null }} />
       <Tabs.Screen name="invoices/[id]" options={{ href: null }} />

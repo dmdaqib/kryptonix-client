@@ -37,20 +37,55 @@ export async function catalogueRoutes(app: FastifyInstance) {
   });
 
   app.get("/catalogue/services", async (request, reply) => {
-    const { categoryId } = z.object({ categoryId: z.string().cuid().optional() }).parse(request.query);
+    const { categoryId, categorySlug, search } = z
+      .object({
+        categoryId: z.string().optional(),
+        categorySlug: z.string().optional(),
+        search: z.string().optional(),
+      })
+      .parse(request.query);
+
+    const where: Record<string, unknown> = { isActive: true };
+    if (categoryId) {
+      where.categoryId = categoryId;
+    } else if (categorySlug) {
+      where.category = { slug: categorySlug };
+    }
+
+    if (search && search.trim().length > 0) {
+      const q = search.trim();
+      where.OR = [
+        { name: { contains: q, mode: "insensitive" } },
+        { summary: { contains: q, mode: "insensitive" } },
+        { description: { contains: q, mode: "insensitive" } },
+        { category: { name: { contains: q, mode: "insensitive" } } },
+      ];
+    }
+
     const services = await prisma.service.findMany({
-      where: { isActive: true, ...(categoryId ? { categoryId } : {}) },
+      where,
       include: {
         category: true,
-        // Cheapest available package only, so the list can show a
-        // "Starting at ₹X" price without fetching every package's detail.
+        // Include available packages with duration and features so mobile cards can show full details
         packages: {
           where: { isAvailable: true },
           orderBy: { priceAmount: "asc" },
-          take: 1,
-          select: { priceAmount: true, currency: true },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            priceAmount: true,
+            currency: true,
+            expectedDurationDays: true,
+            features: {
+              where: { included: true },
+              take: 4,
+              select: { label: true },
+            },
+          },
         },
       },
+      orderBy: { createdAt: "asc" },
     });
     return reply.send({ data: services });
   });
