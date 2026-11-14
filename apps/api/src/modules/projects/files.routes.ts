@@ -4,18 +4,14 @@ import { prisma } from "../../db/prisma.ts";
 import { requireAuth } from "../../plugins/auth.ts";
 import { requireOrgPermission } from "../../plugins/rbac.ts";
 import { ForbiddenError, NotFoundError } from "../../plugins/error-handler.ts";
+import { getStorageProvider } from "../../services/storage.ts";
 
-/**
- * Registers metadata for a file whose bytes were already uploaded directly
- * to object storage via a presigned URL. There is no real storage provider
- * wired up in this sandbox (no outbound network to S3/GCS, same constraint
- * documented in docs/PAYMENTS.md for the payments module) — storageKey is
- * client-supplied and treated as an opaque pointer. A production
- * deployment would add a `POST /files/presign` route backed by a
- * `StorageProvider` interface (mirroring PaymentProvider in
- * modules/payments/provider.ts) before this route is safe to expose
- * publicly; see PROGRESS.md.
- */
+const PresignUploadSchema = z.object({
+  filename: z.string().min(1),
+  mimeType: z.string().min(1),
+  sizeBytes: z.number().int().positive().optional(),
+});
+
 const RegisterFileSchema = z.object({
   category: z.string().min(1),
   originalName: z.string().min(1),
@@ -26,6 +22,48 @@ const RegisterFileSchema = z.object({
 });
 
 export async function fileRoutes(app: FastifyInstance) {
+  app.post("/projects/:id/files/presign", async (request, reply) => {
+    const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) throw new NotFoundError("Project not found");
+
+    requireAuth(request);
+    await requireOrgPermission(request, project.organizationId, "projects.view");
+    const input = PresignUploadSchema.parse(request.body);
+
+    const storage = getStorageProvider();
+    const presigned = await storage.createPresignedUploadUrl({
+      organizationId: project.organizationId,
+      projectId: id,
+      filename: input.filename,
+      mimeType: input.mimeType,
+      sizeBytes: input.sizeBytes,
+    });
+
+    return reply.status(200).send({ data: presigned });
+  });
+
+  app.get("/projects/:id/files/:fileId/download", async (request, reply) => {
+    const { id, fileId } = z
+      .object({ id: z.string().cuid(), fileId: z.string().cuid() })
+      .parse(request.params);
+    const project = await prisma.project.findUnique({ where: { id } });
+    if (!project) throw new NotFoundError("Project not found");
+
+    const authUser = requireAuth(request);
+    await requireOrgPermission(request, project.organizationId, "projects.view");
+
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
+    if (!file || file.projectId !== id) throw new NotFoundError("File not found");
+
+    if (file.visibility === "INTERNAL_ONLY" && authUser.userType !== "STAFF") {
+      throw new ForbiddenError("File is restricted to staff");
+    }
+
+    const storage = getStorageProvider();
+    const download = await storage.createPresignedDownloadUrl(file.storageKey);
+    return reply.status(200).send({ data: { ...download, file } });
+  });
   app.post("/projects/:id/files", async (request, reply) => {
     const { id } = z.object({ id: z.string().cuid() }).parse(request.params);
     const project = await prisma.project.findUnique({ where: { id } });

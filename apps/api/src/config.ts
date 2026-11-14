@@ -25,6 +25,11 @@ const EnvSchema = z.object({
   STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
   STORAGE_LOCAL_PATH: z.string().default("./storage"),
   SIGNED_URL_TTL_SECONDS: z.coerce.number().default(300),
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().default("auto"),
+  S3_ENDPOINT: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
 
   PAYMENT_PROVIDER: z.enum(["razorpay"]).default("razorpay"),
   RAZORPAY_KEY_ID: z.string().optional(),

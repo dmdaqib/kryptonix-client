@@ -94,6 +94,22 @@ test("project manager creates a milestone requiring client approval", async () =
 });
 
 test("project manager registers a file against the project", async () => {
+  // Test presigned upload URL generation
+  const presignRes = await app.inject({
+    method: "POST",
+    url: `/api/v1/projects/${projectId}/files/presign`,
+    headers: authHeader(pm),
+    payload: {
+      filename: "homepage-mockup.fig",
+      mimeType: "application/octet-stream",
+      sizeBytes: 1024,
+    },
+  });
+  assert.equal(presignRes.statusCode, 200);
+  const presignData = presignRes.json().data;
+  assert.ok(presignData.uploadUrl);
+  assert.ok(presignData.storageKey);
+
   const res = await app.inject({
     method: "POST",
     url: `/api/v1/projects/${projectId}/files`,
@@ -101,13 +117,22 @@ test("project manager registers a file against the project", async () => {
     payload: {
       category: "design",
       originalName: "homepage-mockup.fig",
-      storageKey: "test/homepage-mockup.fig",
+      storageKey: presignData.storageKey,
       mimeType: "application/octet-stream",
       sizeBytes: 1024,
     },
   });
   assert.equal(res.statusCode, 201);
   fileId = res.json().data.id;
+
+  // Test presigned download URL generation
+  const downloadRes = await app.inject({
+    method: "GET",
+    url: `/api/v1/projects/${projectId}/files/${fileId}/download`,
+    headers: authHeader(client),
+  });
+  assert.equal(downloadRes.statusCode, 200);
+  assert.ok(downloadRes.json().data.downloadUrl);
 });
 
 test("submitting a deliverable moves the milestone to SUBMITTED_FOR_REVIEW and notifies the client", async () => {
