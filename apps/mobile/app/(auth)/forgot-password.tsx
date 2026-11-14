@@ -5,23 +5,41 @@ import { TextField } from "../../src/components/TextField";
 import { Button } from "../../src/components/Button";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { spacing, typography } from "../../src/theme/tokens";
-import { apiRequest } from "../../src/lib/api-client";
+import { apiRequest, isApiError } from "../../src/lib/api-client";
 
 export default function ForgotPasswordScreen() {
   const theme = useTheme();
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>();
 
   async function onSubmit() {
+    setError(undefined);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError("Please enter your email address.");
+      return;
+    }
+
     setLoading(true);
     try {
-      await apiRequest("/api/v1/auth/forgot-password", { method: "POST", body: { email }, auth: false });
+      await apiRequest("/api/v1/auth/forgot-password", {
+        method: "POST",
+        body: { email: cleanEmail },
+        auth: false,
+      });
+      setSent(true);
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Failed to send reset request. Please check your connection.");
+      }
     } finally {
       setLoading(false);
-      // Same confirmation whether or not the email exists — matches the
-      // backend's enumeration-safe behavior.
-      setSent(true);
     }
   }
 
@@ -45,6 +63,7 @@ export default function ForgotPasswordScreen() {
             value={email}
             onChangeText={setEmail}
           />
+          {error ? <Text style={{ color: theme.danger, marginBottom: spacing.md }}>{error}</Text> : null}
           <Button label="Send Reset Link" onPress={onSubmit} loading={loading} />
         </>
       )}

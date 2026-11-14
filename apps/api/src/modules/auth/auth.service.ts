@@ -15,7 +15,7 @@ import { sendEmail, verificationEmail, passwordResetEmail } from "../../services
 import { recordAudit } from "../../plugins/audit.ts";
 import { randomUUID } from "node:crypto";
 
-const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const MAX_FAILED_LOGIN_ATTEMPTS = env.AUTH_RATE_LIMIT_MAX;
 const failedLoginAttempts = new Map<string, { count: number; lockedUntil?: number }>();
 
 function checkLoginThrottle(email: string) {

@@ -10,6 +10,7 @@ import {
 import * as authService from "./auth.service.ts";
 import { requireAuth } from "../../plugins/auth.ts";
 import { prisma } from "../../db/prisma.ts";
+import { env } from "../../config.ts";
 
 export async function authRoutes(app: FastifyInstance) {
   app.post(
@@ -33,7 +34,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post(
     "/login",
-    { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } },
+    { config: { rateLimit: { max: env.AUTH_RATE_LIMIT_MAX, timeWindow: env.AUTH_RATE_LIMIT_WINDOW_MS } } },
     async (request, reply) => {
       const { email, password } = LoginSchema.parse(request.body);
       const { user, tokens } = await authService.login(email, password, {
@@ -69,7 +70,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post(
     "/forgot-password",
-    { config: { rateLimit: { max: 5, timeWindow: "15 minutes" } } },
+    { config: { rateLimit: { max: env.AUTH_RATE_LIMIT_MAX, timeWindow: env.AUTH_RATE_LIMIT_WINDOW_MS } } },
     async (request, reply) => {
       const { email } = ForgotPasswordSchema.parse(request.body);
       await authService.requestPasswordReset(email);

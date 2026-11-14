@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, Alert } from "react-native";
+import { Text } from "react-native";
 import { Link, router } from "expo-router";
 import { ScreenContainer } from "../../src/components/ScreenContainer";
 import { TextField } from "../../src/components/TextField";
@@ -7,7 +7,7 @@ import { Button } from "../../src/components/Button";
 import { useAuthStore } from "../../src/stores/auth-store";
 import { useTheme } from "../../src/theme/ThemeProvider";
 import { spacing, typography } from "../../src/theme/tokens";
-import { ApiError } from "../../src/lib/api-client";
+import { ApiError, isApiError } from "../../src/lib/api-client";
 
 export default function LoginScreen() {
   const theme = useTheme();
@@ -19,11 +19,27 @@ export default function LoginScreen() {
 
   async function onSubmit() {
     setError(undefined);
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
     try {
-      await login(email.trim().toLowerCase(), password);
+      await login(cleanEmail, password);
       router.replace("/");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      if (isApiError(err)) {
+        setError(err.message);
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Unable to sign in. Please check your network and try again.");
+      }
     }
   }
 
