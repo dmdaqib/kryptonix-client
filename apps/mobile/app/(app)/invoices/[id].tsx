@@ -6,9 +6,11 @@ import RazorpayCheckout from "react-native-razorpay";
 import { ScreenContainer } from "../../../src/components/ScreenContainer";
 import { Card } from "../../../src/components/Card";
 import { Button } from "../../../src/components/Button";
+import { StatusPill } from "../../../src/components/StatusPill";
 import { apiRequest, ApiError } from "../../../src/lib/api-client";
 import { useAuthStore } from "../../../src/stores/auth-store";
 import { useTheme } from "../../../src/theme/ThemeProvider";
+import { formatCurrency } from "../../../src/lib/format";
 import { spacing, typography } from "../../../src/theme/tokens";
 
 interface InvoiceDetail {
@@ -16,10 +18,20 @@ interface InvoiceDetail {
   invoiceNumber: string;
   status: string;
   currency: string;
+  subtotalAmount: string;
+  discountAmount: string;
+  taxAmount: string;
   totalAmount: string;
   amountPaid: string;
   dueDate: string;
-  items: { id: string; description: string; quantity: string; unitPrice: string; lineTotal: string }[];
+  items: {
+    id: string;
+    description: string;
+    quantity: string;
+    unitPrice: string;
+    taxPercent: string;
+    lineTotal: string;
+  }[];
   schedules: { id: string; label: string; amount: string; dueDate: string; status: string }[];
 }
 
@@ -103,33 +115,71 @@ export default function InvoiceDetailScreen() {
   return (
     <ScreenContainer>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={[typography.h2, { color: theme.textPrimary }]}>{invoice.invoiceNumber}</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Text style={[typography.h2, { color: theme.textPrimary }]}>{invoice.invoiceNumber}</Text>
+          <StatusPill status={invoice.status} />
+        </View>
         <Text style={[typography.caption, { color: theme.textSecondary, marginBottom: spacing.md }]}>
           Due {new Date(invoice.dueDate).toLocaleDateString()}
         </Text>
 
+        <Text style={[typography.h3, { color: theme.textPrimary, marginBottom: spacing.sm }]}>Bill details</Text>
         <Card style={{ marginBottom: spacing.md }}>
           {invoice.items.map((item) => (
-            <View key={item.id} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: spacing.xs }}>
-              <Text style={[typography.body, { color: theme.textPrimary, flex: 1 }]}>{item.description}</Text>
-              <Text style={[typography.body, { color: theme.textPrimary }]}>
-                ₹{Number(item.lineTotal).toLocaleString("en-IN")}
-              </Text>
+            <View key={item.id} style={{ marginBottom: spacing.sm }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[typography.body, { color: theme.textPrimary, flex: 1 }]}>{item.description}</Text>
+                <Text style={[typography.body, { color: theme.textPrimary }]}>
+                  {formatCurrency(item.lineTotal, invoice.currency)}
+                </Text>
+              </View>
+              {Number(item.quantity) !== 1 || Number(item.taxPercent) > 0 ? (
+                <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                  Qty {Number(item.quantity)} × {formatCurrency(item.unitPrice, invoice.currency)}
+                  {Number(item.taxPercent) > 0 ? ` · ${Number(item.taxPercent)}% GST` : ""}
+                </Text>
+              ) : null}
             </View>
           ))}
+
+          <View style={{ borderTopWidth: 1, borderTopColor: theme.border, marginTop: spacing.xs, paddingTop: spacing.sm, gap: 6 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={[typography.body, { color: theme.textSecondary }]}>Subtotal</Text>
+              <Text style={[typography.body, { color: theme.textSecondary }]}>
+                {formatCurrency(invoice.subtotalAmount, invoice.currency)}
+              </Text>
+            </View>
+            {Number(invoice.discountAmount) > 0 ? (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[typography.body, { color: theme.textSecondary }]}>Discount</Text>
+                <Text style={[typography.body, { color: theme.success }]}>
+                  -{formatCurrency(invoice.discountAmount, invoice.currency)}
+                </Text>
+              </View>
+            ) : null}
+            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+              <Text style={[typography.body, { color: theme.textSecondary }]}>GST / Tax</Text>
+              <Text style={[typography.body, { color: theme.textSecondary }]}>
+                {formatCurrency(invoice.taxAmount, invoice.currency)}
+              </Text>
+            </View>
+          </View>
+
           <View style={{ borderTopWidth: 1, borderTopColor: theme.border, marginTop: spacing.sm, paddingTop: spacing.sm }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>Total</Text>
+              <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>Total payable</Text>
               <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>
-                ₹{Number(invoice.totalAmount).toLocaleString("en-IN")}
+                {formatCurrency(invoice.totalAmount, invoice.currency)}
               </Text>
             </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={[typography.caption, { color: theme.textSecondary }]}>Paid</Text>
-              <Text style={[typography.caption, { color: theme.textSecondary }]}>
-                ₹{Number(invoice.amountPaid).toLocaleString("en-IN")}
-              </Text>
-            </View>
+            {Number(invoice.amountPaid) > 0 ? (
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={[typography.caption, { color: theme.textSecondary }]}>Paid so far</Text>
+                <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                  {formatCurrency(invoice.amountPaid, invoice.currency)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </Card>
 
@@ -144,7 +194,7 @@ export default function InvoiceDetailScreen() {
                   <View>
                     <Text style={[typography.bodyStrong, { color: theme.textPrimary }]}>{schedule.label}</Text>
                     <Text style={[typography.caption, { color: theme.textSecondary }]}>
-                      ₹{Number(schedule.amount).toLocaleString("en-IN")} · due{" "}
+                      {formatCurrency(schedule.amount, invoice.currency)} · due{" "}
                       {new Date(schedule.dueDate).toLocaleDateString()}
                     </Text>
                   </View>
@@ -164,7 +214,7 @@ export default function InvoiceDetailScreen() {
           </>
         ) : !fullyPaid ? (
           <Button
-            label={`Pay ₹${outstanding.toLocaleString("en-IN")}`}
+            label={`Pay ${formatCurrency(outstanding, invoice.currency)}`}
             loading={payMutation.isPending && !payingScheduleId}
             onPress={() => payMutation.mutate(undefined)}
           />

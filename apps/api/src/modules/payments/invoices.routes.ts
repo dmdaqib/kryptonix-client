@@ -41,6 +41,14 @@ async function nextInvoiceNumber() {
   return `KX-INV-${year}-${String(count + 1).padStart(5, "0")}`;
 }
 
+async function nextQuoteNumber() {
+  const year = new Date().getFullYear();
+  const count = await prisma.quote.count({
+    where: { quoteNumber: { startsWith: `KX-QT-${year}-` } },
+  });
+  return `KX-QT-${year}-${String(count + 1).padStart(5, "0")}`;
+}
+
 export async function invoiceRoutes(app: FastifyInstance) {
   // Finance Manager (staff) creates an invoice for a client organization.
   app.post("/invoices", async (request, reply) => {
@@ -100,6 +108,119 @@ export async function invoiceRoutes(app: FastifyInstance) {
       entityType: "Invoice",
       entityId: invoice.id,
       metaJson: { total: totals.total },
+    });
+
+    return reply.status(201).send({ data: invoice });
+  });
+
+  // Client: buy a fixed-price package directly — no staff involvement needed.
+  // Creates an auto-accepted Quote (so there's a clean paper trail of what
+  // was agreed) and an immediately payable Invoice with a real GST/tax
+  // breakdown, in a single step. The mobile app sends the customer straight
+  // from this response into the existing invoice-detail/Razorpay pay screen.
+  app.post("/organizations/:organizationId/packages/:packageId/purchase", async (request, reply) => {
+    const { organizationId, packageId } = z
+      .object({ organizationId: z.string().cuid(), packageId: z.string().cuid() })
+      .parse(request.params);
+
+    const actor = await requireOrgPermission(request, organizationId, "quotes.accept");
+
+    const pkg = await prisma.servicePackage.findUnique({
+      where: { id: packageId },
+      include: { service: true },
+    });
+    if (!pkg || !pkg.isAvailable) {
+      throw new NotFoundError("This package is not available for purchase");
+    }
+
+    // Prices and tax always come from the backend record, never from the
+    // client request — the mobile app only ever sends a packageId.
+    const unitPrice = Number(pkg.priceAmount);
+    const taxPercent = Number(pkg.taxPercent);
+    const description = `${pkg.service.name} — ${pkg.name}`;
+    const totals = computeInvoiceTotals([{ quantity: 1, unitPrice, taxPercent }], 0);
+
+    const [quoteNumber, invoiceNumber] = await Promise.all([nextQuoteNumber(), nextInvoiceNumber()]);
+
+    const { quote, invoice } = await prisma.$transaction(async (tx) => {
+      const quote = await tx.quote.create({
+        data: {
+          organizationId,
+          createdByUserId: actor.userId,
+          quoteNumber,
+          status: "ACCEPTED",
+          scopeOfWork: description,
+          subtotalAmount: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.total,
+          currency: pkg.currency,
+          paymentTerms: pkg.paymentTerms,
+          items: {
+            create: [
+              {
+                packageId: pkg.id,
+                description,
+                quantity: 1,
+                unitPrice,
+                lineTotal: Math.round(unitPrice * 100) / 100,
+              },
+            ],
+          },
+        },
+      });
+
+      await tx.quoteAcceptance.create({
+        data: {
+          quoteId: quote.id,
+          acceptedByUserId: actor.userId,
+          acceptedQuoteVersion: quote.version,
+          ipAddress: request.ip,
+          userAgent: request.headers["user-agent"],
+        },
+      });
+
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 3);
+
+      const invoice = await tx.invoice.create({
+        data: {
+          organizationId,
+          quoteId: quote.id,
+          invoiceNumber,
+          status: "SENT",
+          dueDate,
+          paymentTerms: pkg.paymentTerms,
+          currency: pkg.currency,
+          subtotalAmount: totals.subtotal,
+          discountAmount: totals.discountAmount,
+          taxAmount: totals.taxAmount,
+          totalAmount: totals.total,
+          items: {
+            create: [
+              {
+                description,
+                quantity: 1,
+                unitPrice,
+                taxPercent,
+                lineTotal: Math.round(unitPrice * 100) / 100,
+              },
+            ],
+          },
+        },
+        include: { items: true, schedules: true },
+      });
+
+      return { quote, invoice };
+    });
+
+    await recordAudit({
+      organizationId,
+      actorUserId: actor.userId,
+      action: "package.purchased",
+      entityType: "Invoice",
+      entityId: invoice.id,
+      metaJson: { packageId, quoteId: quote.id, total: totals.total },
     });
 
     return reply.status(201).send({ data: invoice });

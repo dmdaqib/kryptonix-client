@@ -19,8 +19,13 @@ interface ServicePackage {
   description: string;
   priceAmount: string;
   currency: string;
+  taxPercent: string;
   expectedDurationDays: number | null;
   features: { id: string; label: string; included: boolean }[];
+}
+
+interface PurchaseInvoice {
+  id: string;
 }
 
 interface ServiceDetail {
@@ -36,6 +41,7 @@ export default function ServiceDetailScreen() {
   const { activeOrganizationId } = useAuthStore();
   const [showEnquiry, setShowEnquiry] = useState(false);
   const [requirements, setRequirements] = useState("");
+  const [purchasingPackageId, setPurchasingPackageId] = useState<string | null>(null);
 
   const { data: service } = useQuery({
     queryKey: ["catalogue", "service", slug],
@@ -54,6 +60,18 @@ export default function ServiceDetailScreen() {
         },
       }),
     onSuccess: () => router.back(),
+  });
+
+  const purchasePackage = useMutation({
+    mutationFn: (packageId: string) => {
+      setPurchasingPackageId(packageId);
+      return apiRequest<PurchaseInvoice>(
+        `/api/v1/organizations/${activeOrganizationId}/packages/${packageId}/purchase`,
+        { method: "POST" },
+      );
+    },
+    onSuccess: (invoice) => router.push(`/(app)/invoices/${invoice.id}`),
+    onSettled: () => setPurchasingPackageId(null),
   });
 
   if (!service) return null;
@@ -89,9 +107,16 @@ export default function ServiceDetailScreen() {
                   </View>
                 ) : null}
               </View>
-              <Text style={[typography.h3, { color: theme.primary }]}>
-                {formatCurrency(pkg.priceAmount, pkg.currency)}
-              </Text>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={[typography.h3, { color: theme.primary }]}>
+                  {formatCurrency(pkg.priceAmount, pkg.currency)}
+                </Text>
+                {Number(pkg.taxPercent) > 0 ? (
+                  <Text style={[typography.caption, { color: theme.textSecondary }]}>
+                    +{Number(pkg.taxPercent)}% GST
+                  </Text>
+                ) : null}
+              </View>
             </View>
 
             <Text style={[typography.body, { color: theme.textSecondary, marginTop: spacing.sm }]}>
@@ -114,8 +139,16 @@ export default function ServiceDetailScreen() {
               </View>
             ))}
 
-            <View style={{ marginTop: spacing.md }}>
-              <Button label="Request this package" variant="secondary" onPress={() => setShowEnquiry(true)} />
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+              <Button
+                label={`Buy now — ${formatCurrency(
+                  Number(pkg.priceAmount) * (1 + Number(pkg.taxPercent) / 100),
+                  pkg.currency,
+                )}`}
+                onPress={() => purchasePackage.mutate(pkg.id)}
+                loading={purchasePackage.isPending && purchasingPackageId === pkg.id}
+              />
+              <Button label="Ask a question first" variant="secondary" onPress={() => setShowEnquiry(true)} />
             </View>
           </Card>
         ))}
