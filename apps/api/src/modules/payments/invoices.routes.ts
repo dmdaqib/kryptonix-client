@@ -38,7 +38,8 @@ async function nextInvoiceNumber() {
   const count = await prisma.invoice.count({
     where: { invoiceNumber: { startsWith: `KX-INV-${year}-` } },
   });
-  return `KX-INV-${year}-${String(count + 1).padStart(5, "0")}`;
+  const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `KX-INV-${year}-${String(count + 1).padStart(5, "0")}-${suffix}`;
 }
 
 async function nextQuoteNumber() {
@@ -46,7 +47,8 @@ async function nextQuoteNumber() {
   const count = await prisma.quote.count({
     where: { quoteNumber: { startsWith: `KX-QT-${year}-` } },
   });
-  return `KX-QT-${year}-${String(count + 1).padStart(5, "0")}`;
+  const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `KX-QT-${year}-${String(count + 1).padStart(5, "0")}-${suffix}`;
 }
 
 export async function invoiceRoutes(app: FastifyInstance) {

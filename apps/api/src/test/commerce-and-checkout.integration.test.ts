@@ -112,6 +112,9 @@ test("enquiries: submit custom project proposal requirement", async () => {
       expectedTimeline: "6-8 weeks",
     },
   });
+  if (res.statusCode !== 201) {
+    console.error("Commerce purchase error:", res.statusCode, res.payload);
+  }
   assert.equal(res.statusCode, 201);
   const body = res.json();
   assert.ok(body.data.id);
@@ -141,6 +144,9 @@ test("commerce: purchase package with KRYPTON10 discount and 50% advance schedul
       notes: "Please include dark mode support.",
     },
   });
+  if (res.statusCode !== 201) {
+    console.error("Commerce purchase error:", res.statusCode, res.payload);
+  }
   assert.equal(res.statusCode, 201);
   const body = res.json();
   const invoice = body.data;
