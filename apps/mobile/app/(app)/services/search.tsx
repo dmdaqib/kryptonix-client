@@ -499,3 +499,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.neutral200,
   },
 });
+

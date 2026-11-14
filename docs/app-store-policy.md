@@ -67,3 +67,4 @@ When testing the application in App Store Review or Google Play Console review:
 
 > *"Dear App Review Team,  
 > KryptonIX Client is a B2B project portal for clients of KryptonIX Digital & AI Solutions. The services available for purchase in this application (custom software engineering, website development, enterprise business automation, and digital marketing campaigns) are professional services delivered and consumed entirely outside the application in our clients' real-world business infrastructure. Under Apple App Store Guideline 3.1.3(e) / Google Play Payments Policy, these off-app professional services qualify for direct merchant gateway payment processing. Sandbox payment simulation is supported for testing without real charges."*
+
